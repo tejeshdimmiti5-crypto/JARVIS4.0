@@ -37,13 +37,3 @@ class ChatMessage(Base):
     role:Mapped[str]=mapped_column(String(20))
     content:Mapped[str]=mapped_column(Text)
     created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
-
-# Import feature models so metadata is complete for fresh SQLite/dev databases.
-try:
-    from . import models as _models
-    from . import flashcards as _flashcards
-except ImportError:
-    _models=None
-    _flashcards=None
-
-Base.metadata.create_all(engine)
