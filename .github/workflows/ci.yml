@@ -4,9 +4,6 @@ on:
   push:
   pull_request:
 
-env:
-  PYTHONPATH: server
-
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -18,6 +15,7 @@ jobs:
       DATABASE_URL: sqlite:///./data/ci.db
       JWT_SECRET: test-secret-for-studentai-ci-32-chars
       GEMINI_API_KEY: ''
+      PYTHONPATH: .
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -30,7 +28,7 @@ jobs:
       - run: pip check
       - run: python -m compileall app tests
       - run: alembic upgrade head
-      - run: pytest -q
+      - run: python -m pytest -q
 
   frontend:
     runs-on: ubuntu-latest
