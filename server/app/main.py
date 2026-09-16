@@ -5,7 +5,7 @@ from typing import Any
 import fitz,httpx
 from fastapi import Depends,FastAPI,File,HTTPException,UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .auth import create_token,current_user,db_session,optional_user,password_hash
@@ -14,11 +14,14 @@ from .rag import chunk_document,lexical_retrieve
 from .study import PlanInput,make_plan
 from .vector_store import index_chunks,semantic_search
 GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL','gemini-2.0-flash');ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
-app=FastAPI(title='StudentAI API',version='1.5.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['*'],allow_headers=['*'])
-class ChatRequest(BaseModel):question:str;context:str='';document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
-class ChatResponse(BaseModel):answer:str;model:str;used_ai:bool;sources:list[dict[str,Any]]=[]
+app=FastAPI(title='StudentAI API',version='1.6.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['*'],allow_headers=['*'])
+class ChatRequest(BaseModel):question:str=Field(min_length=1,max_length=12000);context:str='';document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
+class ChatResponse(BaseModel):answer:str;model:str;used_ai:bool;sources:list[dict[str,Any]]=Field(default_factory=list)
 class AuthRequest(BaseModel):email:str;password:str
-class NoteRequest(BaseModel):title:str;content:str
+class NoteRequest(BaseModel):title:str=Field(min_length=1,max_length=200);content:str=Field(min_length=1,max_length=50000)
+class Flashcard(BaseModel):question:str;answer:str
+class FlashcardRequest(BaseModel):topic:str=Field(min_length=1,max_length=4000);count:int=Field(default=10,ge=1,le=30);document_id:str|None=None;context:str=''
+class FlashcardResponse(BaseModel):cards:list[Flashcard];model:str;used_ai:bool
 
 def offline_answer(q:str)->str:
  q=q.lower()
@@ -37,11 +40,21 @@ async def gemini(prompt:str)->str:
  parts=r.json().get('candidates',[{}])[0].get('content',{}).get('parts',[]);a=''.join(p.get('text','') for p in parts).strip()
  if not a:raise HTTPException(502,'Gemini returned an empty response')
  return a
+
+def parse_flashcards(text:str)->list[Flashcard]:
+ cards=[];q=None
+ for raw in text.splitlines():
+  line=raw.strip()
+  if line.lower().startswith('q:'):q=line[2:].strip()
+  elif line.lower().startswith('a:') and q:
+   cards.append(Flashcard(question=q,answer=line[2:].strip()));q=None
+ return cards
 @app.get('/api/health')
 async def health():return {'status':'ok','service':'StudentAI API','ai_configured':bool(GEMINI_API_KEY),'vector_store':'chroma','database':bool(os.getenv('DATABASE_URL'))}
 @app.post('/api/auth/register')
 def register(data:AuthRequest,db:Session=Depends(db_session)):
  email=data.email.strip().lower()
+ if '@' not in email or '.' not in email.split('@')[-1]:raise HTTPException(400,'Enter a valid email address')
  if len(data.password)<8:raise HTTPException(400,'Password must contain at least 8 characters')
  if db.scalar(select(User).where(User.email==email)):raise HTTPException(409,'Email already registered')
  u=User(email=email,password_hash=password_hash.hash(data.password));db.add(u);db.commit();db.refresh(u);return {'access_token':create_token(u.id),'token_type':'bearer','user':{'id':u.id,'email':u.email}}
@@ -54,19 +67,37 @@ def login(data:AuthRequest,db:Session=Depends(db_session)):
 def me(user:User=Depends(current_user)):return {'id':user.id,'email':user.email}
 async def run_chat(req:ChatRequest)->tuple[str,list[dict[str,Any]]]:
  sources=[];retrieved=req.context
- if req.context and req.use_retrieval:
-  chunks=chunk_document(req.context)
-  try:hits=await semantic_search(req.question,req.document_id) if req.semantic and GEMINI_API_KEY else lexical_retrieve(req.question,chunks)
-  except Exception:hits=lexical_retrieve(req.question,chunks)
-  if hits and hasattr(hits[0],'text'):sources=[{'page':h.page,'preview':h.text[:240]} for h in hits];retrieved='\n\n'.join(f'[Page {h.page}]\n{h.text}' for h in hits)
-  else:sources=[{'page':h['page'],'preview':h['text'][:240],'distance':h.get('distance')} for h in hits];retrieved='\n\n'.join(f"[Page {h['page']}]\n{h['text']}" for h in hits)
+ if req.use_retrieval:
+  hits=[]
+  if req.document_id and req.semantic and GEMINI_API_KEY:
+   try:hits=await semantic_search(req.question,req.document_id)
+   except Exception:hits=[]
+  if not hits and req.context:
+   chunks=chunk_document(req.context)
+   try:hits=await semantic_search(req.question,req.document_id) if req.semantic and GEMINI_API_KEY else lexical_retrieve(req.question,chunks)
+   except Exception:hits=lexical_retrieve(req.question,chunks)
+  if hits:
+   if hasattr(hits[0],'text'):sources=[{'page':h.page,'preview':h.text[:240]} for h in hits];retrieved='\n\n'.join(f'[Page {h.page}]\n{h.text}' for h in hits)
+   else:sources=[{'page':h['page'],'preview':h['text'][:240],'distance':h.get('distance')} for h in hits];retrieved='\n\n'.join(f"[Page {h['page']}]\n{h['text']}" for h in hits)
  a=await gemini(build_prompt(req,retrieved));return (a or offline_answer(req.question)),sources
 @app.post('/api/chat',response_model=ChatResponse)
 async def chat(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
- if not req.question.strip():raise HTTPException(400,'Question is required')
  a,sources=await run_chat(req)
  if user:db.add_all([ChatMessage(user_id=user.id,role='user',content=req.question),ChatMessage(user_id=user.id,role='assistant',content=a)]);db.commit()
  return ChatResponse(answer=a,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY),sources=sources)
+@app.post('/api/flashcards/generate',response_model=FlashcardResponse)
+async def generate_flashcards(req:FlashcardRequest):
+ context=req.context
+ if req.document_id and GEMINI_API_KEY:
+  try:
+   hits=await semantic_search(req.topic,req.document_id,top_k=min(req.count,10));context='\n\n'.join(f'[Page {h["page"]}]\n{h["text"]}' for h in hits)
+  except Exception:pass
+ prompt=f'Create exactly {req.count} study flashcards for a university student. Return ONLY lines in this format, with one Q and one A per card:\nQ: question\nA: answer\nTopic: {req.topic}\nMaterial:\n{context[:30000]}'
+ text=await gemini(prompt) if GEMINI_API_KEY else ''
+ cards=parse_flashcards(text)[:req.count] if text else []
+ if not cards:
+  cards=[Flashcard(question=f'What is the key idea of {req.topic}?',answer='Review the topic definition, core concepts, examples, and important exam points.')]
+ return FlashcardResponse(cards=cards,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY))
 @app.get('/api/chat/history')
 def history(limit:int=50,user:User=Depends(current_user),db:Session=Depends(db_session)):
  rows=db.scalars(select(ChatMessage).where(ChatMessage.user_id==user.id).order_by(ChatMessage.created_at.desc()).limit(max(1,min(limit,200)))).all();return [{'id':x.id,'role':x.role,'content':x.content,'created_at':x.created_at.isoformat()} for x in reversed(rows)]
@@ -79,7 +110,7 @@ def clear_history(user:User=Depends(current_user),db:Session=Depends(db_session)
 def study_plan(data:PlanInput,user:User=Depends(current_user)):return make_plan(data)
 @app.post('/api/notes')
 def create_note(data:NoteRequest,user:User=Depends(current_user),db:Session=Depends(db_session)):
- n=StudyNote(user_id=user.id,title=data.title,content=data.content);db.add(n);db.commit();db.refresh(n);return {'id':n.id,'title':n.title,'content':n.content}
+ n=StudyNote(user_id=user.id,title=data.title.strip(),content=data.content.strip());db.add(n);db.commit();db.refresh(n);return {'id':n.id,'title':n.title,'content':n.content}
 @app.get('/api/notes')
 def list_notes(user:User=Depends(current_user),db:Session=Depends(db_session)):
  return [{'id':n.id,'title':n.title,'content':n.content,'created_at':n.created_at.isoformat()} for n in db.scalars(select(StudyNote).where(StudyNote.user_id==user.id).order_by(StudyNote.updated_at.desc())).all()]
