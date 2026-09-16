@@ -10,14 +10,24 @@ jobs:
     defaults:
       run:
         working-directory: server
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: sqlite:///./data/ci.db
+      JWT_SECRET: test-secret-for-studentai-ci-32-chars
+      GEMINI_API_KEY: ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: server/requirements.txt
       - run: pip install -r requirements.txt
-      - run: python -m compileall app
+      - run: pip check
+      - run: python -m compileall app tests
+      - run: alembic upgrade head
       - run: pytest -q
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
