@@ -3,7 +3,7 @@ import os
 from sqlalchemy import engine_from_config,pool
 from alembic import context
 from app.db import Base, DATABASE_URL
-from app import models
+from app import models, flashcards
 
 config=context.config
 if config.config_file_name is not None:fileConfig(config.config_file_name)
