@@ -9,13 +9,15 @@ from pydantic import BaseModel,Field
 from sqlalchemy import func,select
 from sqlalchemy.orm import Session
 from .auth import create_token,current_user,db_session,optional_user,password_hash
-from .db import ChatMessage,StudyNote,User
+from .db import ChatMessage,StudyNote,User,Base,engine
 from .models import StudyEvent,StudyTask,Subject
+from .analytics import daily_summary
 from .rag import chunk_document,lexical_retrieve
 from .study import PlanInput,make_plan
 from .vector_store import index_chunks,semantic_search
+Base.metadata.create_all(engine)
 GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL','gemini-2.0-flash');ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
-app=FastAPI(title='StudentAI API',version='1.7.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['*'],allow_headers=['*'])
+app=FastAPI(title='StudentAI API',version='1.8.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Authorization','Content-Type'])
 class ChatRequest(BaseModel):question:str=Field(min_length=1,max_length=12000);context:str='';document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
 class ChatResponse(BaseModel):answer:str;model:str;used_ai:bool;sources:list[dict[str,Any]]=Field(default_factory=list)
 class AuthRequest(BaseModel):email:str;password:str
@@ -52,7 +54,12 @@ def parse_flashcards(text:str)->list[Flashcard]:
   elif line.lower().startswith('a:') and q:cards.append(Flashcard(question=q,answer=line[2:].strip()));q=None
  return cards
 @app.get('/api/health')
-async def health():return {'status':'ok','service':'StudentAI API','ai_configured':bool(GEMINI_API_KEY),'vector_store':'chroma','database':bool(os.getenv('DATABASE_URL'))}
+async def health():
+ database=False
+ try:
+  with engine.connect() as c:c.exec_driver_sql('SELECT 1');database=True
+ except Exception:pass
+ return {'status':'ok','service':'StudentAI API','ai_configured':bool(GEMINI_API_KEY),'vector_store':'chroma','database':database}
 @app.post('/api/auth/register')
 def register(data:AuthRequest,db:Session=Depends(db_session)):
  email=data.email.strip().lower()
@@ -98,6 +105,8 @@ async def generate_flashcards(req:FlashcardRequest,user:User|None=Depends(option
  if not cards:cards=[Flashcard(question=f'What is the key idea of {req.topic}?',answer='Review the definition, core concepts, examples, and exam points.')]
  if user:event(db,user.id,'flashcard')
  return FlashcardResponse(cards=cards,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY))
+@app.get('/api/analytics/daily')
+def analytics_daily(days:int=7,user:User=Depends(current_user),db:Session=Depends(db_session)):return daily_summary(db,user.id,days)
 @app.get('/api/subjects')
 def list_subjects(user:User=Depends(current_user),db:Session=Depends(db_session)):
  return [{'id':s.id,'name':s.name,'code':s.code,'daily_minutes':s.daily_minutes,'exam_date':s.exam_date.isoformat() if s.exam_date else None} for s in db.scalars(select(Subject).where(Subject.user_id==user.id).order_by(Subject.name)).all()]
@@ -118,7 +127,8 @@ def delete_subject(subject_id:int,user:User=Depends(current_user),db:Session=Dep
 def study_plan(data:PlanInput,user:User=Depends(current_user),db:Session=Depends(db_session)):
  plan=make_plan(data)
  for t in plan.tasks:
-  db.add(StudyTask(user_id=user.id,title=f'{t.subject}: {t.topic}',task_date=t.date,minutes=t.minutes))
+  subject=db.scalar(select(Subject).where(Subject.user_id==user.id,Subject.name==t.subject))
+  db.add(StudyTask(user_id=user.id,subject_id=subject.id if subject else None,title=f'{t.subject}: {t.topic}',task_date=t.date,minutes=t.minutes))
  db.commit();event(db,user.id,'plan')
  return plan
 @app.get('/api/study/tasks')
@@ -169,9 +179,9 @@ async def extract_pdf(file:UploadFile=File(...),user:User|None=Depends(optional_
   return {'document_id':did,'filename':file.filename,'pages':len(pages),'characters':len(text),'chunks':len(chunks),'indexed_chunks':indexed,'text':text[:150000]}
  except Exception as e:raise HTTPException(422,f'Could not read PDF: {e}') from e
 @app.post('/api/pdf/study',response_model=ChatResponse)
-async def study_pdf(req:ChatRequest):req.task=req.task or 'summary';a,s=await run_chat(req);return ChatResponse(answer=a,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY),sources=s)
+async def study_pdf(req:ChatRequest):a,s=await run_chat(req);return ChatResponse(answer=a,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY),sources=s)
 @app.get('/api/documents/{document_id}/search')
 async def search_document(document_id:str,q:str,top_k:int=5):
  if not GEMINI_API_KEY:raise HTTPException(503,'Semantic search requires GEMINI_API_KEY')
- try:return {'results':await semantic_search(q,document_id,max(1,min(top_k,10)))}
- except Exception as e:raise HTTPException(502,str(e)) from e
+ try:return await semantic_search(q,document_id,max(1,min(top_k,20)))
+ except Exception as e:raise HTTPException(502,f'Search failed: {e}') from e
