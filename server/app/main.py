@@ -11,11 +11,11 @@ from sqlalchemy.orm import Session
 from .auth import create_token,current_user,db_session,optional_user,password_hash
 from .db import ChatMessage,StudyNote,User
 from .rag import chunk_document,lexical_retrieve
+from .study import PlanInput,make_plan
 from .vector_store import index_chunks,semantic_search
 GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL','gemini-2.0-flash');ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
-app=FastAPI(title='StudentAI API',version='1.4.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['*'],allow_headers=['*'])
-class ChatRequest(BaseModel):
- question:str;context:str='';document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
+app=FastAPI(title='StudentAI API',version='1.5.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['*'],allow_headers=['*'])
+class ChatRequest(BaseModel):question:str;context:str='';document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
 class ChatResponse(BaseModel):answer:str;model:str;used_ai:bool;sources:list[dict[str,Any]]=[]
 class AuthRequest(BaseModel):email:str;password:str
 class NoteRequest(BaseModel):title:str;content:str
@@ -52,21 +52,21 @@ def login(data:AuthRequest,db:Session=Depends(db_session)):
  return {'access_token':create_token(u.id),'token_type':'bearer','user':{'id':u.id,'email':u.email}}
 @app.get('/api/auth/me')
 def me(user:User=Depends(current_user)):return {'id':user.id,'email':user.email}
-@app.post('/api/chat',response_model=ChatResponse)
-async def chat(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
- if not req.question.strip():raise HTTPException(400,'Question is required')
+async def run_chat(req:ChatRequest)->tuple[str,list[dict[str,Any]]]:
  sources=[];retrieved=req.context
  if req.context and req.use_retrieval:
   chunks=chunk_document(req.context)
-  try:
-   hits=await semantic_search(req.question,req.document_id) if req.semantic and GEMINI_API_KEY else lexical_retrieve(req.question,chunks)
+  try:hits=await semantic_search(req.question,req.document_id) if req.semantic and GEMINI_API_KEY else lexical_retrieve(req.question,chunks)
   except Exception:hits=lexical_retrieve(req.question,chunks)
   if hits and hasattr(hits[0],'text'):sources=[{'page':h.page,'preview':h.text[:240]} for h in hits];retrieved='\n\n'.join(f'[Page {h.page}]\n{h.text}' for h in hits)
   else:sources=[{'page':h['page'],'preview':h['text'][:240],'distance':h.get('distance')} for h in hits];retrieved='\n\n'.join(f"[Page {h['page']}]\n{h['text']}" for h in hits)
- answer=await gemini(build_prompt(req,retrieved));answer=answer or offline_answer(req.question)
- if user:
-  db.add(ChatMessage(user_id=user.id,role='user',content=req.question));db.add(ChatMessage(user_id=user.id,role='assistant',content=answer));db.commit()
- return ChatResponse(answer=answer,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY),sources=sources)
+ a=await gemini(build_prompt(req,retrieved));return (a or offline_answer(req.question)),sources
+@app.post('/api/chat',response_model=ChatResponse)
+async def chat(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
+ if not req.question.strip():raise HTTPException(400,'Question is required')
+ a,sources=await run_chat(req)
+ if user:db.add_all([ChatMessage(user_id=user.id,role='user',content=req.question),ChatMessage(user_id=user.id,role='assistant',content=a)]);db.commit()
+ return ChatResponse(answer=a,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY),sources=sources)
 @app.get('/api/chat/history')
 def history(limit:int=50,user:User=Depends(current_user),db:Session=Depends(db_session)):
  rows=db.scalars(select(ChatMessage).where(ChatMessage.user_id==user.id).order_by(ChatMessage.created_at.desc()).limit(max(1,min(limit,200)))).all();return [{'id':x.id,'role':x.role,'content':x.content,'created_at':x.created_at.isoformat()} for x in reversed(rows)]
@@ -75,6 +75,8 @@ def clear_history(user:User=Depends(current_user),db:Session=Depends(db_session)
  rows=db.scalars(select(ChatMessage).where(ChatMessage.user_id==user.id)).all()
  for x in rows:db.delete(x)
  db.commit();return {'deleted':len(rows)}
+@app.post('/api/study/plan')
+def study_plan(data:PlanInput,user:User=Depends(current_user)):return make_plan(data)
 @app.post('/api/notes')
 def create_note(data:NoteRequest,user:User=Depends(current_user),db:Session=Depends(db_session)):
  n=StudyNote(user_id=user.id,title=data.title,content=data.content);db.add(n);db.commit();db.refresh(n);return {'id':n.id,'title':n.title,'content':n.content}
@@ -99,7 +101,7 @@ async def extract_pdf(file:UploadFile=File(...)):
   return {'document_id':did,'filename':file.filename,'pages':len(pages),'characters':len(text),'chunks':len(chunks),'indexed_chunks':indexed,'text':text[:150000]}
  except Exception as e:raise HTTPException(422,f'Could not read PDF: {e}') from e
 @app.post('/api/pdf/study',response_model=ChatResponse)
-async def study_pdf(req:ChatRequest):req.task=req.task or 'summary';return await chat(req)
+async def study_pdf(req:ChatRequest):req.task=req.task or 'summary';a,s=await run_chat(req);return ChatResponse(answer=a,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY),sources=s)
 @app.get('/api/documents/{document_id}/search')
 async def search_document(document_id:str,q:str,top_k:int=5):
  if not GEMINI_API_KEY:raise HTTPException(503,'Semantic search requires GEMINI_API_KEY')
