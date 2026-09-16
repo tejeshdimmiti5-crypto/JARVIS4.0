@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os,uuid
+from datetime import datetime
 from io import BytesIO
 from typing import Any
 import fitz,httpx
@@ -11,13 +12,14 @@ from sqlalchemy.orm import Session
 from .auth import create_token,current_user,db_session,optional_user,password_hash
 from .db import ChatMessage,StudyNote,User,Base,engine
 from .models import StudyEvent,StudyTask,Subject
+from .flashcards import FlashcardRecord
 from .analytics import daily_summary
 from .rag import chunk_document,lexical_retrieve
 from .study import PlanInput,make_plan
 from .vector_store import index_chunks,semantic_search
 Base.metadata.create_all(engine)
 GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL','gemini-2.0-flash');ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
-app=FastAPI(title='StudentAI API',version='1.8.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Authorization','Content-Type'])
+app=FastAPI(title='StudentAI API',version='1.9.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Authorization','Content-Type'])
 class ChatRequest(BaseModel):question:str=Field(min_length=1,max_length=12000);context:str='';document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
 class ChatResponse(BaseModel):answer:str;model:str;used_ai:bool;sources:list[dict[str,Any]]=Field(default_factory=list)
 class AuthRequest(BaseModel):email:str;password:str
@@ -103,8 +105,24 @@ async def generate_flashcards(req:FlashcardRequest,user:User|None=Depends(option
  text=await gemini(f'Create exactly {req.count} study flashcards. Return ONLY Q:/A: lines. Topic: {req.topic}\nMaterial:\n{context[:30000]}') if GEMINI_API_KEY else ''
  cards=parse_flashcards(text)[:req.count] if text else []
  if not cards:cards=[Flashcard(question=f'What is the key idea of {req.topic}?',answer='Review the definition, core concepts, examples, and exam points.')]
- if user:event(db,user.id,'flashcard')
+ if user:
+  for c in cards:db.add(FlashcardRecord(user_id=user.id,question=c.question,answer=c.answer,document_id=req.document_id))
+  db.commit();event(db,user.id,'flashcard')
  return FlashcardResponse(cards=cards,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY))
+@app.get('/api/flashcards')
+def list_flashcards(user:User=Depends(current_user),db:Session=Depends(db_session)):
+ rows=db.scalars(select(FlashcardRecord).where(FlashcardRecord.user_id==user.id).order_by(FlashcardRecord.created_at.desc())).all()
+ return [{'id':x.id,'question':x.question,'answer':x.answer,'document_id':x.document_id,'review_count':x.review_count,'last_reviewed_at':x.last_reviewed_at.isoformat() if x.last_reviewed_at else None} for x in rows]
+@app.post('/api/flashcards/{card_id}/review')
+def review_flashcard(card_id:int,user:User=Depends(current_user),db:Session=Depends(db_session)):
+ card=db.scalar(select(FlashcardRecord).where(FlashcardRecord.id==card_id,FlashcardRecord.user_id==user.id))
+ if not card:raise HTTPException(404,'Flashcard not found')
+ card.review_count+=1;card.last_reviewed_at=datetime.utcnow();db.commit();event(db,user.id,'flashcard_review');return {'id':card.id,'review_count':card.review_count,'last_reviewed_at':card.last_reviewed_at.isoformat()}
+@app.delete('/api/flashcards/{card_id}')
+def delete_flashcard(card_id:int,user:User=Depends(current_user),db:Session=Depends(db_session)):
+ card=db.scalar(select(FlashcardRecord).where(FlashcardRecord.id==card_id,FlashcardRecord.user_id==user.id))
+ if not card:raise HTTPException(404,'Flashcard not found')
+ db.delete(card);db.commit();return {'deleted':True}
 @app.get('/api/analytics/daily')
 def analytics_daily(days:int=7,user:User=Depends(current_user),db:Session=Depends(db_session)):return daily_summary(db,user.id,days)
 @app.get('/api/subjects')
@@ -129,8 +147,7 @@ def study_plan(data:PlanInput,user:User=Depends(current_user),db:Session=Depends
  for t in plan.tasks:
   subject=db.scalar(select(Subject).where(Subject.user_id==user.id,Subject.name==t.subject))
   db.add(StudyTask(user_id=user.id,subject_id=subject.id if subject else None,title=f'{t.subject}: {t.topic}',task_date=t.date,minutes=t.minutes))
- db.commit();event(db,user.id,'plan')
- return plan
+ db.commit();event(db,user.id,'plan');return plan
 @app.get('/api/study/tasks')
 def study_tasks(user:User=Depends(current_user),db:Session=Depends(db_session)):
  rows=db.scalars(select(StudyTask).where(StudyTask.user_id==user.id).order_by(StudyTask.task_date,StudyTask.id)).all();return [{'id':t.id,'title':t.title,'date':t.task_date.isoformat(),'minutes':t.minutes,'completed':bool(t.completed)} for t in rows]
