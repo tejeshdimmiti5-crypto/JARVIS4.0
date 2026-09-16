@@ -7,3 +7,7 @@ httpx==0.28.1
 python-dotenv==1.1.1
 chromadb==1.0.20
 numpy==2.3.2
+SQLAlchemy==2.0.43
+psycopg[binary]==3.2.9
+PyJWT==2.10.1
+pwdlib[argon2]==0.2.1
