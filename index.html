@@ -1,68 +1,22 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="StudentAI — a browser-based study assistant for notes, summaries and quizzes." />
-  <title>StudentAI — Study Assistant</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css" />
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="description" content="StudentAI — AI study assistant with PDF chat, notes and quizzes."><title>StudentAI — AI Study Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
 </head>
-<body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand"><span class="brand-mark">✦</span><span>StudentAI</span></div>
-      <button class="new-chat" id="newChat">＋ New session</button>
-      <nav>
-        <p class="nav-label">Workspace</p>
-        <button class="nav-item active" data-view="chat">⌘ <span>Study Chat</span></button>
-        <button class="nav-item" data-view="notes">▤ <span>My Notes</span></button>
-        <button class="nav-item" data-view="quiz">✓ <span>Quiz Me</span></button>
-        <button class="nav-item" data-view="progress">◒ <span>Progress</span></button>
-      </nav>
-      <div class="sidebar-bottom">
-        <div class="tip"><strong>Study smarter</strong><span>Ask questions, save notes and test yourself.</span></div>
-        <div class="student-pill"><div class="avatar">T</div><div><strong>Student</strong><small>Local workspace</small></div></div>
-      </div>
-    </aside>
-
-    <main class="main">
-      <header class="topbar"><div><span class="eyebrow">STUDY WORKSPACE</span><h1 id="pageTitle">Study Chat</h1></div><button class="icon-btn" id="clearData" title="Clear local data">↺</button></header>
-
-      <section class="view active" id="chatView">
-        <div class="welcome" id="welcome">
-          <div class="sparkle">✦</div><h2>What are you studying today?</h2><p>Ask a question and StudentAI will help you learn it in a simple, exam-friendly way.</p>
-          <div class="suggestions">
-            <button>Explain supervised learning simply</button><button>Give me 5 questions on DBMS</button><button>Summarize the idea of Big Data</button><button>What should I revise before an exam?</button>
-          </div>
-        </div>
-        <div class="messages" id="messages"></div>
-        <form class="composer" id="chatForm">
-          <textarea id="prompt" rows="1" placeholder="Ask StudentAI anything about your studies…" required></textarea>
-          <button class="send" aria-label="Send">↑</button>
-        </form>
-        <p class="disclaimer">StudentAI runs locally in your browser. Answers are educational and should be checked against your course material.</p>
-      </section>
-
-      <section class="view" id="notesView">
-        <div class="section-head"><div><h2>My Notes</h2><p>Save quick revision points in your browser.</p></div><button class="primary" id="addNote">＋ Add note</button></div>
-        <div class="notes-grid" id="notesGrid"></div>
-      </section>
-
-      <section class="view" id="quizView">
-        <div class="section-head"><div><h2>Quiz Me</h2><p>Practice with built-in questions. Your score is saved locally.</p></div><select id="quizTopic"><option value="ml">Machine Learning</option><option value="ds">Data Structures</option><option value="dbms">DBMS</option><option value="ai">Artificial Intelligence</option></select></div>
-        <div class="quiz-card" id="quizCard"></div>
-      </section>
-
-      <section class="view" id="progressView">
-        <div class="section-head"><div><h2>Progress</h2><p>A simple view of your activity on this device.</p></div></div>
-        <div class="stats"><div class="stat"><span>Questions asked</span><strong id="statQuestions">0</strong></div><div class="stat"><span>Notes saved</span><strong id="statNotes">0</strong></div><div class="stat"><span>Quiz points</span><strong id="statQuiz">0</strong></div></div>
-        <div class="progress-card"><h3>Keep the streak going</h3><p>Use Study Chat to understand a topic, save the key idea as a note, then test yourself in Quiz Me.</p><div class="progress-bar"><span id="progressBar"></span></div><small id="progressText">0% activity</small></div>
-      </section>
-    </main>
-  </div>
-  <script src="app.js"></script>
-</body>
-</html>
+<body><div class="app-shell"><aside class="sidebar"><div class="brand"><span class="brand-mark">✦</span><span>StudentAI</span></div>
+<button class="new-chat" id="newChat">＋ New session</button><nav><p class="nav-label">Workspace</p>
+<button class="nav-item active" data-view="chat">⌘ <span>Study Chat</span></button><button class="nav-item" data-view="pdf">▣ <span>PDF Study</span></button><button class="nav-item" data-view="notes">▤ <span>My Notes</span></button><button class="nav-item" data-view="quiz">✓ <span>Quiz Me</span></button><button class="nav-item" data-view="progress">◒ <span>Progress</span></button></nav>
+<div class="sidebar-bottom"><div class="tip"><strong>Real AI study mode</strong><span>Add your Gemini API key locally, then chat with your notes or PDFs.</span></div><div class="student-pill"><div class="avatar">T</div><div><strong>Student</strong><small>Private browser workspace</small></div></div></div></aside>
+<main class="main"><header class="topbar"><div><span class="eyebrow">AI STUDY WORKSPACE</span><h1 id="pageTitle">Study Chat</h1></div><button class="icon-btn" id="settingsBtn">⚙</button></header>
+<section class="view active" id="chatView"><div class="welcome" id="welcome"><div class="sparkle">✦</div><h2>What are you studying today?</h2><p>Ask StudentAI a question. If you add a Gemini key, answers come from the real AI model.</p><div class="suggestions"><button>Explain supervised learning simply</button><button>Give me 5 DBMS revision questions</button><button>Explain Big Data for an exam</button><button>Make a 7-day study plan</button></div></div><div class="messages" id="messages"></div>
+<form class="composer" id="chatForm"><textarea id="prompt" rows="1" placeholder="Ask StudentAI anything about your studies…" required></textarea><button class="send" aria-label="Send">↑</button></form><p class="disclaimer">Your API key and study data stay in this browser. Never use a secret key in a public/shared computer.</p></section>
+<section class="view" id="pdfView"><div class="section-head"><div><h2>PDF Study</h2><p>Upload a PDF, extract its text in your browser, then ask the AI about it.</p></div></div><div class="upload-card"><label class="dropzone" for="pdfInput"><span class="upload-icon">↑</span><strong>Choose a PDF</strong><small id="pdfStatus">Text is processed locally before being sent to the AI.</small><input id="pdfInput" type="file" accept="application/pdf"></label><div class="pdf-tools"><button class="primary" id="summarizePdf" disabled>✦ Summarize PDF</button><button class="secondary" id="clearPdf" disabled>Clear</button></div><div class="pdf-preview" id="pdfPreview">No PDF loaded.</div></div></section>
+<section class="view" id="notesView"><div class="section-head"><div><h2>My Notes</h2><p>Save revision points locally.</p></div><button class="primary" id="addNote">＋ Add note</button></div><div class="notes-grid" id="notesGrid"></div></section>
+<section class="view" id="quizView"><div class="section-head"><div><h2>Quiz Me</h2><p>Practice with built-in questions.</p></div><select id="quizTopic"><option value="ml">Machine Learning</option><option value="ds">Data Structures</option><option value="dbms">DBMS</option><option value="ai">Artificial Intelligence</option></select></div><div class="quiz-card" id="quizCard"></div></section>
+<section class="view" id="progressView"><div class="section-head"><div><h2>Progress</h2><p>Your activity on this device.</p></div></div><div class="stats"><div class="stat"><span>AI questions</span><strong id="statQuestions">0</strong></div><div class="stat"><span>Notes saved</span><strong id="statNotes">0</strong></div><div class="stat"><span>Quiz points</span><strong id="statQuiz">0</strong></div></div><div class="progress-card"><h3>Study loop</h3><p>Ask → understand → save a note → quiz yourself.</p><div class="progress-bar"><span id="progressBar"></span></div><small id="progressText">0% activity</small></div></section></main></div>
+<div class="modal" id="settingsModal"><div class="modal-box"><button class="modal-close" id="closeSettings">×</button><h2>AI Settings</h2><p>Use a Gemini API key for real AI responses. The key is saved only in this browser's local storage.</p><label>Gemini API key<input id="apiKey" type="password" placeholder="Paste your key here"></label><label>Model<input id="modelName" value="gemini-2.5-flash"></label><button class="primary full" id="saveSettings">Save settings</button><small>Do not commit your API key to GitHub. For a production app, move AI calls to a secure backend.</small></div></div>
+<script src="app.js"></script></body></html>
