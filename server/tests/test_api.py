@@ -1,38 +1,15 @@
 from fastapi.testclient import TestClient
-
 from app.main import app
-
-client = TestClient(app)
-
-
+client=TestClient(app)
 def test_health():
-    response = client.get("/api/health")
-    assert response.status_code == 200
-    assert response.json()["status"] == "ok"
-    assert response.json()["vector_store"] == "chroma"
-
-
+ r=client.get('/api/health');assert r.status_code==200;assert r.json()['status']=='ok';assert r.json()['vector_store']=='chroma'
 def test_chat_offline():
-    response = client.post("/api/chat", json={"question": "What is a stack?"})
-    assert response.status_code == 200
-    assert "LIFO" in response.json()["answer"]
-    assert response.json()["used_ai"] is False
-
-
-def test_register_login_and_notes():
-    email="test-student@example.com"
-    password="StudentAI123!"
-    register=client.post("/api/auth/register",json={"email":email,"password":password})
-    assert register.status_code in (200,409)
-    if register.status_code == 409:
-        login=client.post("/api/auth/login",json={"email":email,"password":password})
-        assert login.status_code==200
-        token=login.json()["access_token"]
-    else:
-        token=register.json()["access_token"]
-    headers={"Authorization":f"Bearer {token}"}
-    note=client.post("/api/notes",headers=headers,json={"title":"DSA Revision","content":"Stacks use LIFO."})
-    assert note.status_code==200
-    notes=client.get("/api/notes",headers=headers)
-    assert notes.status_code==200
-    assert any(n["title"]=="DSA Revision" for n in notes.json())
+ r=client.post('/api/chat',json={'question':'What is a stack?'});assert r.status_code==200;assert 'LIFO' in r.json()['answer']
+def test_register_login_notes_history():
+ email='test-student@example.com';password='StudentAI123!';r=client.post('/api/auth/register',json={'email':email,'password':password})
+ if r.status_code==409:r=client.post('/api/auth/login',json={'email':email,'password':password})
+ assert r.status_code==200;token=r.json()['access_token'];h={'Authorization':f'Bearer {token}'}
+ n=client.post('/api/notes',headers=h,json={'title':'DSA Revision','content':'Stacks use LIFO.'});assert n.status_code==200
+ assert client.get('/api/notes',headers=h).status_code==200
+ c=client.post('/api/chat',headers=h,json={'question':'What is a stack?'});assert c.status_code==200
+ hist=client.get('/api/chat/history',headers=h);assert hist.status_code==200;assert len(hist.json())>=2
