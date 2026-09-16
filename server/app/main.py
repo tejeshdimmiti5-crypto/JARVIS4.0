@@ -11,7 +11,7 @@ from sqlalchemy import delete,func,select
 from sqlalchemy.orm import Session
 from .auth import create_token,current_user,db_session,optional_user,password_hash
 from .db import ChatMessage,StudyNote,User,Base,engine
-from .models import StudyEvent,StudyTask,Subject
+from .models import DocumentRecord,StudyEvent,StudyTask,Subject
 from .flashcards import FlashcardRecord
 from .analytics import daily_summary
 from .rag import chunk_document,lexical_retrieve
@@ -19,13 +19,13 @@ from .study import PlanInput,make_plan
 from .vector_store import index_chunks,semantic_search
 Base.metadata.create_all(engine)
 GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL','gemini-2.0-flash');ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
-app=FastAPI(title='StudentAI API',version='1.9.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Authorization','Content-Type'])
-class ChatRequest(BaseModel):question:str=Field(min_length=1,max_length=12000);context:str='';document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
+app=FastAPI(title='StudentAI API',version='2.0.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Authorization','Content-Type'])
+class ChatRequest(BaseModel):question:str=Field(min_length=1,max_length=12000);context:str=Field(default='',max_length=50000);document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
 class ChatResponse(BaseModel):answer:str;model:str;used_ai:bool;sources:list[dict[str,Any]]=Field(default_factory=list)
 class AuthRequest(BaseModel):email:str;password:str
 class NoteRequest(BaseModel):title:str=Field(min_length=1,max_length=200);content:str=Field(min_length=1,max_length=50000)
 class Flashcard(BaseModel):question:str;answer:str
-class FlashcardRequest(BaseModel):topic:str=Field(min_length=1,max_length=4000);count:int=Field(default=10,ge=1,le=30);document_id:str|None=None;context:str=''
+class FlashcardRequest(BaseModel):topic:str=Field(min_length=1,max_length=4000);count:int=Field(default=10,ge=1,le=30);document_id:str|None=None;context:str=Field(default='',max_length=50000)
 class FlashcardResponse(BaseModel):cards:list[Flashcard];model:str;used_ai:bool
 class SubjectRequest(BaseModel):name:str=Field(min_length=1,max_length=100);code:str=Field(default='',max_length=30);daily_minutes:int=Field(default=60,ge=15,le=480);exam_date:str|None=None
 class TaskComplete(BaseModel):completed:bool
@@ -55,6 +55,10 @@ def parse_flashcards(text:str)->list[Flashcard]:
   if line.lower().startswith('q:'):q=line[2:].strip()
   elif line.lower().startswith('a:') and q:cards.append(Flashcard(question=q,answer=line[2:].strip()));q=None
  return cards
+def owned_document(db:Session,user:User,document_id:str)->DocumentRecord:
+ record=db.scalar(select(DocumentRecord).where(DocumentRecord.document_id==document_id,DocumentRecord.user_id==user.id))
+ if not record:raise HTTPException(404,'Document not found')
+ return record
 @app.get('/api/health')
 async def health():
  database=False
@@ -93,11 +97,17 @@ async def run_chat(req:ChatRequest)->tuple[str,list[dict[str,Any]]]:
  a=await gemini(build_prompt(req,retrieved));return (a or offline_answer(req.question)),sources
 @app.post('/api/chat',response_model=ChatResponse)
 async def chat(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
+ if req.document_id:
+  if not user:raise HTTPException(401,'Authentication required for document study')
+  owned_document(db,user,req.document_id)
  a,sources=await run_chat(req)
  if user:db.add_all([ChatMessage(user_id=user.id,role='user',content=req.question),ChatMessage(user_id=user.id,role='assistant',content=a)]);db.commit();event(db,user.id,'question')
  return ChatResponse(answer=a,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY),sources=sources)
 @app.post('/api/flashcards/generate',response_model=FlashcardResponse)
 async def generate_flashcards(req:FlashcardRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
+ if req.document_id:
+  if not user:raise HTTPException(401,'Authentication required for document flashcards')
+  owned_document(db,user,req.document_id)
  context=req.context
  if req.document_id and GEMINI_API_KEY:
   try:context='\n\n'.join(f'[Page {h["page"]}]\n{h["text"]}' for h in await semantic_search(req.topic,req.document_id,top_k=min(req.count,10)))
@@ -142,10 +152,8 @@ def delete_subject(subject_id:int,user:User=Depends(current_user),db:Session=Dep
  db.delete(s);db.commit();return {'deleted':True}
 @app.post('/api/study/plan')
 def study_plan(data:PlanInput,user:User=Depends(current_user),db:Session=Depends(db_session)):
- plan=make_plan(data)
- planned_dates={date.fromisoformat(t.date) for t in plan.tasks}
- if planned_dates:
-  db.execute(delete(StudyTask).where(StudyTask.user_id==user.id,StudyTask.completed==0,StudyTask.task_date.in_(planned_dates)))
+ plan=make_plan(data);planned_dates={date.fromisoformat(t.date) for t in plan.tasks}
+ if planned_dates:db.execute(delete(StudyTask).where(StudyTask.user_id==user.id,StudyTask.completed==0,StudyTask.task_date.in_(planned_dates)))
  for t in plan.tasks:
   subject=db.scalar(select(Subject).where(Subject.user_id==user.id,Subject.name==t.subject))
   db.add(StudyTask(user_id=user.id,subject_id=subject.id if subject else None,title=f'{t.subject}: {t.topic}',task_date=date.fromisoformat(t.date),minutes=t.minutes))
@@ -190,17 +198,30 @@ async def extract_pdf(file:UploadFile=File(...),user:User|None=Depends(optional_
  raw=await file.read()
  if len(raw)>20*1024*1024:raise HTTPException(413,'PDF must be smaller than 20 MB')
  try:
-  doc=fitz.open(stream=BytesIO(raw),filetype='pdf');pages=[p.get_text('text') for p in doc];text='\n\n'.join(f'PAGE {i+1}\n{v}' for i,v in enumerate(pages)).strip();did=str(uuid.uuid4());chunks=chunk_document(text);indexed=0
+  doc=fitz.open(stream=BytesIO(raw),filetype='pdf')
+  if doc.page_count>500:raise HTTPException(413,'PDF must contain 500 pages or fewer')
+  pages=[p.get_text('text') for p in doc];text='\n\n'.join(f'PAGE {i+1}\n{v}' for i,v in enumerate(pages)).strip();did=str(uuid.uuid4());chunks=chunk_document(text);indexed=0
   if GEMINI_API_KEY:
    try:indexed=await index_chunks(did,[{'page':c.page,'text':c.text} for c in chunks])
    except Exception:pass
-  if user:event(db,user.id,'pdf_upload')
+  if user:
+   db.add(DocumentRecord(user_id=user.id,document_id=did,filename=file.filename or 'document.pdf',pages=len(pages)));db.commit();event(db,user.id,'pdf_upload')
   return {'document_id':did,'filename':file.filename,'pages':len(pages),'characters':len(text),'chunks':len(chunks),'indexed_chunks':indexed,'text':text[:150000]}
+ except HTTPException:raise
  except Exception as e:raise HTTPException(422,f'Could not read PDF: {e}') from e
 @app.post('/api/pdf/study',response_model=ChatResponse)
-async def study_pdf(req:ChatRequest):a,s=await run_chat(req);return ChatResponse(answer=a,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY),sources=s)
+async def study_pdf(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
+ if req.document_id:
+  if not user:raise HTTPException(401,'Authentication required for document study')
+  owned_document(db,user,req.document_id)
+ a,s=await run_chat(req);return ChatResponse(answer=a,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY),sources=s)
+@app.get('/api/documents')
+def list_documents(user:User=Depends(current_user),db:Session=Depends(db_session)):
+ rows=db.scalars(select(DocumentRecord).where(DocumentRecord.user_id==user.id).order_by(DocumentRecord.created_at.desc())).all()
+ return [{'document_id':x.document_id,'filename':x.filename,'pages':x.pages,'created_at':x.created_at.isoformat()} for x in rows]
 @app.get('/api/documents/{document_id}/search')
-async def search_document(document_id:str,q:str,top_k:int=5):
+async def search_document(document_id:str,q:str,top_k:int=5,user:User=Depends(current_user),db:Session=Depends(db_session)):
+ owned_document(db,user,document_id)
  if not GEMINI_API_KEY:raise HTTPException(503,'Semantic search requires GEMINI_API_KEY')
  try:return await semantic_search(q,document_id,max(1,min(top_k,20)))
  except Exception as e:raise HTTPException(502,f'Search failed: {e}') from e
