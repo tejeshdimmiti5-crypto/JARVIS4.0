@@ -1,18 +1,24 @@
 # StudentAI — AI-Powered RAG Study Assistant
 
-StudentAI is a full-stack study workspace designed for university students. It combines a React frontend with a FastAPI AI backend to turn lecture material into interactive study sessions.
+StudentAI is a full-stack AI study workspace for university students. It combines React, FastAPI, Gemini, semantic retrieval, ChromaDB and PostgreSQL to turn lecture material into an interactive study system.
 
-## What it does
+## Features
 
-- 🤖 AI study chat with Gemini
-- 📄 PDF upload and server-side text extraction
-- ✨ Exam-ready PDF summaries
-- 🧠 AI-generated quiz prompts
-- 📝 Personal revision notes
-- 📊 Local study activity dashboard
-- 🔐 API keys stay on the backend in `.env`
-- 🐳 Docker Compose development environment
-- ✅ GitHub Actions CI for backend tests and frontend builds
+- 🤖 Gemini-powered academic Q&A
+- 📄 PDF upload, extraction and page-aware chunking
+- 🧠 Semantic RAG with Gemini embeddings + ChromaDB
+- 🔎 Source/page-aware retrieval results
+- ✨ Exam-ready summaries and revision notes
+- 📝 Persistent personal notes
+- ❓ AI quiz generation
+- 🃏 Interactive AI flashcards
+- 🗓️ 7-day study planner
+- 💬 Persistent authenticated chat history
+- 🔐 JWT authentication + Argon2 password hashing
+- 🐘 PostgreSQL persistence with SQLite development fallback
+- 📊 Study activity dashboard
+- 🐳 Docker Compose environment
+- ✅ Automated backend tests + frontend build CI
 
 ## Architecture
 
@@ -20,43 +26,49 @@ StudentAI is a full-stack study workspace designed for university students. It c
 React + Vite
      │
      ▼
-FastAPI REST API ──────► Gemini API
-     │
-     └────────► PyMuPDF PDF extraction
+FastAPI REST API ─────────► Gemini Generate Content
+     │                         │
+     ├── JWT + Argon2          └── Gemini Embeddings
+     ├── PostgreSQL                 │
+     ├── PyMuPDF                    ▼
+     └── RAG pipeline ─────────► ChromaDB
 ```
 
 ## Tech stack
 
 **Frontend:** React, JavaScript, Vite, Lucide Icons  
-**Backend:** Python, FastAPI, Pydantic, HTTPX  
-**AI:** Gemini API  
+**Backend:** Python, FastAPI, Pydantic, HTTPX, SQLAlchemy  
+**AI:** Gemini generation + embeddings  
+**RAG:** ChromaDB, semantic retrieval, page-aware sources  
 **PDF:** PyMuPDF  
-**DevOps:** Docker Compose, GitHub Actions  
+**Database:** PostgreSQL / SQLite fallback  
+**Security:** JWT, Argon2 password hashing, server-side API keys  
+**DevOps:** Docker Compose, GitHub Actions
 
 ## Run locally
 
-### 1. Backend
+### Backend
 
 ```bash
 cd server
 python -m venv .venv
 # Windows
-.venv\Scripts\activate
+.venv\\Scripts\\activate
 pip install -r requirements.txt
 copy .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
-Put your Gemini API key in `server/.env`:
+Configure `server/.env`:
 
 ```env
 GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-2.0-flash
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+JWT_SECRET=replace-with-a-long-random-secret
 ```
 
-### 2. Frontend
-
-In another terminal:
+### Frontend
 
 ```bash
 cd frontend
@@ -64,32 +76,40 @@ npm install
 npm run dev
 ```
 
-Then open the Vite URL shown in the terminal, normally `http://localhost:5173`.
+Open the Vite URL, normally `http://localhost:5173`.
 
-### 3. Docker
+### Docker
 
 ```bash
-copy server/.env.example server/.env
-# add GEMINI_API_KEY to server/.env
 docker compose up --build
 ```
 
-## API endpoints
+## API
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| GET | `/api/health` | Backend health check |
-| POST | `/api/chat` | AI study chat |
-| POST | `/api/pdf/extract` | Extract PDF text |
-| POST | `/api/pdf/study` | Generate an AI study response from PDF text |
+| GET | `/api/health` | Health/status check |
+| POST | `/api/auth/register` | Create account |
+| POST | `/api/auth/login` | Login and receive JWT |
+| GET | `/api/auth/me` | Current user |
+| POST | `/api/chat` | AI study chat + RAG |
+| GET | `/api/chat/history` | Persistent chat history |
+| DELETE | `/api/chat/history` | Clear chat history |
+| POST | `/api/pdf/extract` | Extract and index PDF |
+| POST | `/api/pdf/study` | AI study response from PDF |
+| GET | `/api/documents/{id}/search` | Semantic document search |
+| POST | `/api/notes` | Save revision note |
+| GET | `/api/notes` | List notes |
+| DELETE | `/api/notes/{id}` | Delete note |
+| POST | `/api/study/plan` | Generate a study plan |
 
-Interactive API docs are available at `http://localhost:8000/docs`.
+Interactive Swagger docs: `http://localhost:8000/docs`
 
-## Resume project description
+## Resume description
 
 **StudentAI — AI-Powered RAG Study Assistant**  
-Built a full-stack AI study platform using React and FastAPI with Gemini-powered academic Q&A, PDF ingestion through PyMuPDF, exam-ready summarization, quiz generation, local progress tracking, Dockerized development, and GitHub Actions CI. The architecture is designed to evolve toward semantic chunking, embeddings, vector search, citations, authentication, and persistent PostgreSQL storage.
+Built a full-stack AI study platform using React and FastAPI with Gemini-powered academic Q&A, PDF ingestion through PyMuPDF, semantic retrieval with ChromaDB and Gemini embeddings, page-aware source tracking, JWT/Argon2 authentication, PostgreSQL persistence, AI quizzes and flashcards, a study planner, Dockerized development and GitHub Actions CI.
 
 ## Security
 
-Never commit `.env`, API keys, tokens, or credentials. The production architecture keeps the Gemini credential server-side rather than exposing it in browser code.
+Never commit `.env`, API keys, tokens or database credentials. Gemini credentials remain server-side. Use strong secrets and managed database credentials in production.
