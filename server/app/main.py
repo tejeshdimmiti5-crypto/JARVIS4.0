@@ -6,15 +6,16 @@ import fitz,httpx
 from fastapi import Depends,FastAPI,File,HTTPException,UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel,Field
-from sqlalchemy import select
+from sqlalchemy import func,select
 from sqlalchemy.orm import Session
 from .auth import create_token,current_user,db_session,optional_user,password_hash
 from .db import ChatMessage,StudyNote,User
+from .models import StudyEvent,StudyTask,Subject
 from .rag import chunk_document,lexical_retrieve
 from .study import PlanInput,make_plan
 from .vector_store import index_chunks,semantic_search
 GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL','gemini-2.0-flash');ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
-app=FastAPI(title='StudentAI API',version='1.6.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['*'],allow_headers=['*'])
+app=FastAPI(title='StudentAI API',version='1.7.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['*'],allow_headers=['*'])
 class ChatRequest(BaseModel):question:str=Field(min_length=1,max_length=12000);context:str='';document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
 class ChatResponse(BaseModel):answer:str;model:str;used_ai:bool;sources:list[dict[str,Any]]=Field(default_factory=list)
 class AuthRequest(BaseModel):email:str;password:str
@@ -22,7 +23,10 @@ class NoteRequest(BaseModel):title:str=Field(min_length=1,max_length=200);conten
 class Flashcard(BaseModel):question:str;answer:str
 class FlashcardRequest(BaseModel):topic:str=Field(min_length=1,max_length=4000);count:int=Field(default=10,ge=1,le=30);document_id:str|None=None;context:str=''
 class FlashcardResponse(BaseModel):cards:list[Flashcard];model:str;used_ai:bool
+class SubjectRequest(BaseModel):name:str=Field(min_length=1,max_length=100);code:str=Field(default='',max_length=30);daily_minutes:int=Field(default=60,ge=15,le=480);exam_date:str|None=None
+class TaskComplete(BaseModel):completed:bool
 
+def event(db,user_id,event_type,minutes=0):db.add(StudyEvent(user_id=user_id,event_type=event_type,minutes=minutes));db.commit()
 def offline_answer(q:str)->str:
  q=q.lower()
  if 'supervised' in q:return 'Supervised learning trains a model with labelled examples. Classification predicts categories, while regression predicts numerical values.'
@@ -40,14 +44,12 @@ async def gemini(prompt:str)->str:
  parts=r.json().get('candidates',[{}])[0].get('content',{}).get('parts',[]);a=''.join(p.get('text','') for p in parts).strip()
  if not a:raise HTTPException(502,'Gemini returned an empty response')
  return a
-
 def parse_flashcards(text:str)->list[Flashcard]:
  cards=[];q=None
  for raw in text.splitlines():
   line=raw.strip()
   if line.lower().startswith('q:'):q=line[2:].strip()
-  elif line.lower().startswith('a:') and q:
-   cards.append(Flashcard(question=q,answer=line[2:].strip()));q=None
+  elif line.lower().startswith('a:') and q:cards.append(Flashcard(question=q,answer=line[2:].strip()));q=None
  return cards
 @app.get('/api/health')
 async def health():return {'status':'ok','service':'StudentAI API','ai_configured':bool(GEMINI_API_KEY),'vector_store':'chroma','database':bool(os.getenv('DATABASE_URL'))}
@@ -77,27 +79,63 @@ async def run_chat(req:ChatRequest)->tuple[str,list[dict[str,Any]]]:
    try:hits=await semantic_search(req.question,req.document_id) if req.semantic and GEMINI_API_KEY else lexical_retrieve(req.question,chunks)
    except Exception:hits=lexical_retrieve(req.question,chunks)
   if hits:
-   if hasattr(hits[0],'text'):sources=[{'page':h.page,'preview':h.text[:240]} for h in hits];retrieved='\n\n'.join(f'[Page {h.page}]\n{h.text}' for h in hits)
-   else:sources=[{'page':h['page'],'preview':h['text'][:240],'distance':h.get('distance')} for h in hits];retrieved='\n\n'.join(f"[Page {h['page']}]\n{h['text']}" for h in hits)
+   sources=[{'page':h.page,'preview':h.text[:240]} for h in hits] if hasattr(hits[0],'text') else [{'page':h['page'],'preview':h['text'][:240],'distance':h.get('distance')} for h in hits]
+   retrieved='\n\n'.join(f'[Page {h.page}]\n{h.text}' for h in hits) if hasattr(hits[0],'text') else '\n\n'.join(f"[Page {h['page']}]\n{h['text']}" for h in hits)
  a=await gemini(build_prompt(req,retrieved));return (a or offline_answer(req.question)),sources
 @app.post('/api/chat',response_model=ChatResponse)
 async def chat(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
  a,sources=await run_chat(req)
- if user:db.add_all([ChatMessage(user_id=user.id,role='user',content=req.question),ChatMessage(user_id=user.id,role='assistant',content=a)]);db.commit()
+ if user:db.add_all([ChatMessage(user_id=user.id,role='user',content=req.question),ChatMessage(user_id=user.id,role='assistant',content=a)]);db.commit();event(db,user.id,'question')
  return ChatResponse(answer=a,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY),sources=sources)
 @app.post('/api/flashcards/generate',response_model=FlashcardResponse)
-async def generate_flashcards(req:FlashcardRequest):
+async def generate_flashcards(req:FlashcardRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
  context=req.context
  if req.document_id and GEMINI_API_KEY:
-  try:
-   hits=await semantic_search(req.topic,req.document_id,top_k=min(req.count,10));context='\n\n'.join(f'[Page {h["page"]}]\n{h["text"]}' for h in hits)
+  try:context='\n\n'.join(f'[Page {h["page"]}]\n{h["text"]}' for h in await semantic_search(req.topic,req.document_id,top_k=min(req.count,10)))
   except Exception:pass
- prompt=f'Create exactly {req.count} study flashcards for a university student. Return ONLY lines in this format, with one Q and one A per card:\nQ: question\nA: answer\nTopic: {req.topic}\nMaterial:\n{context[:30000]}'
- text=await gemini(prompt) if GEMINI_API_KEY else ''
+ text=await gemini(f'Create exactly {req.count} study flashcards. Return ONLY Q:/A: lines. Topic: {req.topic}\nMaterial:\n{context[:30000]}') if GEMINI_API_KEY else ''
  cards=parse_flashcards(text)[:req.count] if text else []
- if not cards:
-  cards=[Flashcard(question=f'What is the key idea of {req.topic}?',answer='Review the topic definition, core concepts, examples, and important exam points.')]
+ if not cards:cards=[Flashcard(question=f'What is the key idea of {req.topic}?',answer='Review the definition, core concepts, examples, and exam points.')]
+ if user:event(db,user.id,'flashcard')
  return FlashcardResponse(cards=cards,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY))
+@app.get('/api/subjects')
+def list_subjects(user:User=Depends(current_user),db:Session=Depends(db_session)):
+ return [{'id':s.id,'name':s.name,'code':s.code,'daily_minutes':s.daily_minutes,'exam_date':s.exam_date.isoformat() if s.exam_date else None} for s in db.scalars(select(Subject).where(Subject.user_id==user.id).order_by(Subject.name)).all()]
+@app.post('/api/subjects')
+def create_subject(data:SubjectRequest,user:User=Depends(current_user),db:Session=Depends(db_session)):
+ from datetime import date
+ exam=None
+ if data.exam_date:
+  try:exam=date.fromisoformat(data.exam_date)
+  except ValueError:raise HTTPException(400,'exam_date must use YYYY-MM-DD')
+ s=Subject(user_id=user.id,name=data.name.strip(),code=data.code.strip(),daily_minutes=data.daily_minutes,exam_date=exam);db.add(s);db.commit();db.refresh(s);return {'id':s.id,'name':s.name,'code':s.code,'daily_minutes':s.daily_minutes,'exam_date':data.exam_date}
+@app.delete('/api/subjects/{subject_id}')
+def delete_subject(subject_id:int,user:User=Depends(current_user),db:Session=Depends(db_session)):
+ s=db.scalar(select(Subject).where(Subject.id==subject_id,Subject.user_id==user.id))
+ if not s:raise HTTPException(404,'Subject not found')
+ db.delete(s);db.commit();return {'deleted':True}
+@app.post('/api/study/plan')
+def study_plan(data:PlanInput,user:User=Depends(current_user),db:Session=Depends(db_session)):
+ plan=make_plan(data)
+ for t in plan.tasks:
+  db.add(StudyTask(user_id=user.id,title=f'{t.subject}: {t.topic}',task_date=t.date,minutes=t.minutes))
+ db.commit();event(db,user.id,'plan')
+ return plan
+@app.get('/api/study/tasks')
+def study_tasks(user:User=Depends(current_user),db:Session=Depends(db_session)):
+ rows=db.scalars(select(StudyTask).where(StudyTask.user_id==user.id).order_by(StudyTask.task_date,StudyTask.id)).all();return [{'id':t.id,'title':t.title,'date':t.task_date.isoformat(),'minutes':t.minutes,'completed':bool(t.completed)} for t in rows]
+@app.patch('/api/study/tasks/{task_id}')
+def complete_task(task_id:int,data:TaskComplete,user:User=Depends(current_user),db:Session=Depends(db_session)):
+ t=db.scalar(select(StudyTask).where(StudyTask.id==task_id,StudyTask.user_id==user.id))
+ if not t:raise HTTPException(404,'Task not found')
+ t.completed=1 if data.completed else 0;db.commit();event(db,user.id,'task_complete' if data.completed else 'task_uncomplete',t.minutes if data.completed else 0);return {'id':t.id,'completed':bool(t.completed)}
+@app.get('/api/analytics/summary')
+def analytics(user:User=Depends(current_user),db:Session=Depends(db_session)):
+ total_questions=db.scalar(select(func.count()).select_from(StudyEvent).where(StudyEvent.user_id==user.id,StudyEvent.event_type=='question')) or 0
+ total_minutes=db.scalar(select(func.coalesce(func.sum(StudyEvent.minutes),0)).where(StudyEvent.user_id==user.id)) or 0
+ completed=db.scalar(select(func.count()).select_from(StudyTask).where(StudyTask.user_id==user.id,StudyTask.completed==1)) or 0
+ tasks=db.scalar(select(func.count()).select_from(StudyTask).where(StudyTask.user_id==user.id)) or 0
+ return {'questions':total_questions,'study_minutes':int(total_minutes),'completed_tasks':completed,'total_tasks':tasks,'notes':db.scalar(select(func.count()).select_from(StudyNote).where(StudyNote.user_id==user.id)) or 0,'subjects':db.scalar(select(func.count()).select_from(Subject).where(Subject.user_id==user.id)) or 0}
 @app.get('/api/chat/history')
 def history(limit:int=50,user:User=Depends(current_user),db:Session=Depends(db_session)):
  rows=db.scalars(select(ChatMessage).where(ChatMessage.user_id==user.id).order_by(ChatMessage.created_at.desc()).limit(max(1,min(limit,200)))).all();return [{'id':x.id,'role':x.role,'content':x.content,'created_at':x.created_at.isoformat()} for x in reversed(rows)]
@@ -106,11 +144,9 @@ def clear_history(user:User=Depends(current_user),db:Session=Depends(db_session)
  rows=db.scalars(select(ChatMessage).where(ChatMessage.user_id==user.id)).all()
  for x in rows:db.delete(x)
  db.commit();return {'deleted':len(rows)}
-@app.post('/api/study/plan')
-def study_plan(data:PlanInput,user:User=Depends(current_user)):return make_plan(data)
 @app.post('/api/notes')
 def create_note(data:NoteRequest,user:User=Depends(current_user),db:Session=Depends(db_session)):
- n=StudyNote(user_id=user.id,title=data.title.strip(),content=data.content.strip());db.add(n);db.commit();db.refresh(n);return {'id':n.id,'title':n.title,'content':n.content}
+ n=StudyNote(user_id=user.id,title=data.title.strip(),content=data.content.strip());db.add(n);db.commit();db.refresh(n);event(db,user.id,'note');return {'id':n.id,'title':n.title,'content':n.content}
 @app.get('/api/notes')
 def list_notes(user:User=Depends(current_user),db:Session=Depends(db_session)):
  return [{'id':n.id,'title':n.title,'content':n.content,'created_at':n.created_at.isoformat()} for n in db.scalars(select(StudyNote).where(StudyNote.user_id==user.id).order_by(StudyNote.updated_at.desc())).all()]
@@ -120,7 +156,7 @@ def delete_note(note_id:int,user:User=Depends(current_user),db:Session=Depends(d
  if not n:raise HTTPException(404,'Note not found')
  db.delete(n);db.commit();return {'deleted':True}
 @app.post('/api/pdf/extract')
-async def extract_pdf(file:UploadFile=File(...)):
+async def extract_pdf(file:UploadFile=File(...),user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
  if file.content_type!='application/pdf' and not (file.filename or '').lower().endswith('.pdf'):raise HTTPException(400,'Please upload a PDF file')
  raw=await file.read()
  if len(raw)>20*1024*1024:raise HTTPException(413,'PDF must be smaller than 20 MB')
@@ -129,6 +165,7 @@ async def extract_pdf(file:UploadFile=File(...)):
   if GEMINI_API_KEY:
    try:indexed=await index_chunks(did,[{'page':c.page,'text':c.text} for c in chunks])
    except Exception:pass
+  if user:event(db,user.id,'pdf_upload')
   return {'document_id':did,'filename':file.filename,'pages':len(pages),'characters':len(text),'chunks':len(chunks),'indexed_chunks':indexed,'text':text[:150000]}
  except Exception as e:raise HTTPException(422,f'Could not read PDF: {e}') from e
 @app.post('/api/pdf/study',response_model=ChatResponse)
