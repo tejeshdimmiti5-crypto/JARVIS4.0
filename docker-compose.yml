@@ -1,10 +1,31 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: studentai
+      POSTGRES_USER: studentai
+      POSTGRES_PASSWORD: studentai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U studentai -d studentai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
   backend:
     build: ./server
     ports:
       - "8000:8000"
     env_file:
       - ./server/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://studentai:studentai@postgres:5432/studentai
+      CHROMA_PATH: /app/data/chroma
+    volumes:
+      - chroma_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
   frontend:
     image: node:22-alpine
@@ -19,3 +40,6 @@ services:
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     depends_on:
       - backend
+volumes:
+  postgres_data:
+  chroma_data:
