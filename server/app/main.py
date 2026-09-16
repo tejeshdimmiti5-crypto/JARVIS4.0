@@ -1,13 +1,13 @@
 from __future__ import annotations
 import os,uuid
-from datetime import datetime
+from datetime import date,datetime,timezone
 from io import BytesIO
 from typing import Any
 import fitz,httpx
 from fastapi import Depends,FastAPI,File,HTTPException,UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel,Field
-from sqlalchemy import func,select
+from sqlalchemy import delete,func,select
 from sqlalchemy.orm import Session
 from .auth import create_token,current_user,db_session,optional_user,password_hash
 from .db import ChatMessage,StudyNote,User,Base,engine
@@ -117,7 +117,7 @@ def list_flashcards(user:User=Depends(current_user),db:Session=Depends(db_sessio
 def review_flashcard(card_id:int,user:User=Depends(current_user),db:Session=Depends(db_session)):
  card=db.scalar(select(FlashcardRecord).where(FlashcardRecord.id==card_id,FlashcardRecord.user_id==user.id))
  if not card:raise HTTPException(404,'Flashcard not found')
- card.review_count+=1;card.last_reviewed_at=datetime.utcnow();db.commit();event(db,user.id,'flashcard_review');return {'id':card.id,'review_count':card.review_count,'last_reviewed_at':card.last_reviewed_at.isoformat()}
+ card.review_count+=1;card.last_reviewed_at=datetime.now(timezone.utc);db.commit();event(db,user.id,'flashcard_review');return {'id':card.id,'review_count':card.review_count,'last_reviewed_at':card.last_reviewed_at.isoformat()}
 @app.delete('/api/flashcards/{card_id}')
 def delete_flashcard(card_id:int,user:User=Depends(current_user),db:Session=Depends(db_session)):
  card=db.scalar(select(FlashcardRecord).where(FlashcardRecord.id==card_id,FlashcardRecord.user_id==user.id))
@@ -130,7 +130,6 @@ def list_subjects(user:User=Depends(current_user),db:Session=Depends(db_session)
  return [{'id':s.id,'name':s.name,'code':s.code,'daily_minutes':s.daily_minutes,'exam_date':s.exam_date.isoformat() if s.exam_date else None} for s in db.scalars(select(Subject).where(Subject.user_id==user.id).order_by(Subject.name)).all()]
 @app.post('/api/subjects')
 def create_subject(data:SubjectRequest,user:User=Depends(current_user),db:Session=Depends(db_session)):
- from datetime import date
  exam=None
  if data.exam_date:
   try:exam=date.fromisoformat(data.exam_date)
@@ -144,9 +143,12 @@ def delete_subject(subject_id:int,user:User=Depends(current_user),db:Session=Dep
 @app.post('/api/study/plan')
 def study_plan(data:PlanInput,user:User=Depends(current_user),db:Session=Depends(db_session)):
  plan=make_plan(data)
+ planned_dates={date.fromisoformat(t.date) for t in plan.tasks}
+ if planned_dates:
+  db.execute(delete(StudyTask).where(StudyTask.user_id==user.id,StudyTask.completed==0,StudyTask.task_date.in_(planned_dates)))
  for t in plan.tasks:
   subject=db.scalar(select(Subject).where(Subject.user_id==user.id,Subject.name==t.subject))
-  db.add(StudyTask(user_id=user.id,subject_id=subject.id if subject else None,title=f'{t.subject}: {t.topic}',task_date=t.date,minutes=t.minutes))
+  db.add(StudyTask(user_id=user.id,subject_id=subject.id if subject else None,title=f'{t.subject}: {t.topic}',task_date=date.fromisoformat(t.date),minutes=t.minutes))
  db.commit();event(db,user.id,'plan');return plan
 @app.get('/api/study/tasks')
 def study_tasks(user:User=Depends(current_user),db:Session=Depends(db_session)):
