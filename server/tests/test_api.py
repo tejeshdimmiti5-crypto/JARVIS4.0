@@ -17,9 +17,10 @@ def auth_user():
 def test_health():
     r=client.get('/api/health')
     assert r.status_code==200
-    assert r.json()['status']=='ok'
-    assert r.json()['database']=='ok'
-    assert r.json()['vector_store']=='chroma'
+    body=r.json()
+    assert body['status']=='ok'
+    assert body['database'] is True
+    assert body['vector_store']=='chroma'
 
 
 def test_chat_offline():
@@ -80,7 +81,7 @@ def test_daily_analytics_and_tasks():
     h=auth_user()
     subject=client.post('/api/subjects',headers=h,json={'name':'Data Structures','code':'DSA','daily_minutes':60})
     assert subject.status_code==200
-    plan=client.post('/api/study/plan',headers=h,json={'subjects':subject.json() and [{'name':'Data Structures','code':'DSA','daily_minutes':60}],'days':2})
+    plan=client.post('/api/study/plan',headers=h,json={'subjects':[{'name':'Data Structures','code':'DSA','daily_minutes':60}],'days':2})
     assert plan.status_code==200
     tasks=client.get('/api/study/tasks',headers=h)
     assert tasks.status_code==200
