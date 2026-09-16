@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+env:
+  PYTHONPATH: server
+
 jobs:
   backend:
     runs-on: ubuntu-latest
