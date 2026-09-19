@@ -1,115 +1,65 @@
-# StudentAI — AI-Powered RAG Study Assistant
+# JARVIS — Personal AI Study & Productivity Assistant
 
-StudentAI is a full-stack AI study workspace for university students. It combines React, FastAPI, Gemini, semantic retrieval, ChromaDB and PostgreSQL to turn lecture material into an interactive study system.
+JARVIS is the upgraded identity of this full-stack AI assistant. It combines React + Vite, FastAPI, Gemini, PDF/RAG retrieval, PostgreSQL/SQLite, ChromaDB, authentication, notes, quizzes, flashcards, study planning and progress tracking.
 
 ## Features
 
-- 🤖 Gemini-powered academic Q&A
-- 📄 PDF upload, extraction and page-aware chunking
-- 🧠 Semantic RAG with Gemini embeddings + ChromaDB
-- 🔎 Source/page-aware retrieval results
-- ✨ Exam-ready summaries and revision notes
-- 📝 Persistent personal notes
-- ❓ AI quiz generation
-- 🃏 Interactive AI flashcards
-- 🗓️ 7-day study planner
-- 💬 Persistent authenticated chat history
-- 🔐 JWT authentication + Argon2 password hashing
-- 🐘 PostgreSQL persistence with SQLite development fallback
-- 📊 Study activity dashboard
-- 🐳 Docker Compose environment
-- ✅ Automated backend tests + frontend build CI
+- Gemini AI conversation with offline fallback
+- PDF upload, extraction and page-aware retrieval
+- Semantic RAG with ChromaDB + Gemini embeddings
+- Exam-ready summaries, notes and quizzes
+- AI flashcards with review tracking
+- Persistent chat history and personal notes
+- Subject management and 7-day study planner
+- Study analytics and streak tracking
+- JWT authentication + Argon2 password hashing
+- Docker Compose development stack
+- Production frontend/backend container support
 
-## Architecture
+## Windows setup
 
-```text
-React + Vite
-     │
-     ▼
-FastAPI REST API ─────────► Gemini Generate Content
-     │                         │
-     ├── JWT + Argon2          └── Gemini Embeddings
-     ├── PostgreSQL                 │
-     ├── PyMuPDF                    ▼
-     └── RAG pipeline ─────────► ChromaDB
+Clone:
+
+```powershell
+git clone https://github.com/tejeshdimmiti5-crypto/chartbot___1.git
+cd chartbot___1
 ```
 
-## Tech stack
+Backend:
 
-**Frontend:** React, JavaScript, Vite, Lucide Icons  
-**Backend:** Python, FastAPI, Pydantic, HTTPX, SQLAlchemy  
-**AI:** Gemini generation + embeddings  
-**RAG:** ChromaDB, semantic retrieval, page-aware sources  
-**PDF:** PyMuPDF  
-**Database:** PostgreSQL / SQLite fallback  
-**Security:** JWT, Argon2 password hashing, server-side API keys  
-**DevOps:** Docker Compose, GitHub Actions
-
-## Run locally
-
-### Backend
-
-```bash
+```powershell
 cd server
 python -m venv .venv
-# Windows
-.venv\\Scripts\\activate
+.venv\\Scripts\\Activate.ps1
 pip install -r requirements.txt
 copy .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
-Configure `server/.env`:
+Set `server/.env` with your Gemini key and a strong JWT secret.
 
-```env
-GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-2.0-flash
-GEMINI_EMBEDDING_MODEL=gemini-embedding-001
-JWT_SECRET=replace-with-a-long-random-secret
-```
+Frontend (second PowerShell):
 
-### Frontend
-
-```bash
-cd frontend
+```powershell
+cd chartbot___1/frontend
 npm install
 npm run dev
 ```
 
-Open the Vite URL, normally `http://localhost:5173`.
+Open the Vite URL, normally http://localhost:5173.
 
-### Docker
+Docker option from repository root:
 
-```bash
+```powershell
 docker compose up --build
 ```
 
-## API
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/api/health` | Health/status check |
-| POST | `/api/auth/register` | Create account |
-| POST | `/api/auth/login` | Login and receive JWT |
-| GET | `/api/auth/me` | Current user |
-| POST | `/api/chat` | AI study chat + RAG |
-| GET | `/api/chat/history` | Persistent chat history |
-| DELETE | `/api/chat/history` | Clear chat history |
-| POST | `/api/pdf/extract` | Extract and index PDF |
-| POST | `/api/pdf/study` | AI study response from PDF |
-| GET | `/api/documents/{id}/search` | Semantic document search |
-| POST | `/api/notes` | Save revision note |
-| GET | `/api/notes` | List notes |
-| DELETE | `/api/notes/{id}` | Delete note |
-| POST | `/api/study/plan` | Generate a study plan |
-
-Interactive Swagger docs: `http://localhost:8000/docs`
-
-## Resume description
-
-**StudentAI — AI-Powered RAG Study Assistant**  
-Built a full-stack AI study platform using React and FastAPI with Gemini-powered academic Q&A, PDF ingestion through PyMuPDF, semantic retrieval with ChromaDB and Gemini embeddings, page-aware source tracking, JWT/Argon2 authentication, PostgreSQL persistence, AI quizzes and flashcards, a study planner, Dockerized development and GitHub Actions CI.
+Swagger: http://localhost:8000/docs
 
 ## Security
 
-Never commit `.env`, API keys, tokens or database credentials. Gemini credentials remain server-side. Use strong secrets and managed database credentials in production.
+Never commit `.env`, API keys, passwords, tokens or database credentials.
+
+## Repository name
+
+The repository is intentionally still named `chartbot___1` until local verification is complete. It can then be renamed to JARVIS without losing the Git history.
