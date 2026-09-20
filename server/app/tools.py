@@ -96,6 +96,7 @@ TOOLS: dict[str, ToolDefinition] = {
     "progress_summary": ToolDefinition("progress_summary", "Summarize study task completion progress.", progress_summary_tool),
     "planner_summary": ToolDefinition("planner_summary", "Show pending study tasks for planning.", planner_summary_tool),
     "study_dashboard": ToolDefinition("study_dashboard", "Summarize subjects, notes, and study task progress.", study_dashboard_tool),
+    "study_dashboard": ToolDefinition("study_dashboard", "Summarize subjects, notes, and study task progress.", study_dashboard_tool),
     "notes_summary": ToolDefinition("notes_summary", "Summarize a supplied list of saved notes.", notes_summary_tool),
     "time": ToolDefinition("time", "Return the current date and time for a timezone.", time_tool),
     "calculator": ToolDefinition("calculator", "Safely evaluate basic arithmetic expressions.", calculator_tool),
@@ -119,7 +120,9 @@ def tool_for_text(text: str) -> tuple[str, dict[str, Any]] | None:
         return "progress_summary", {"tasks": []}
     if q in {"show my planner", "my planner", "study planner", "what should i study"}:
         return "planner_summary", {"tasks": []}
-    match = re.search(r"(?:calculate|what is)\\s+([0-9pi e+\\-*/().%]+)$", q)
+    if q in {"show my dashboard", "my dashboard", "study dashboard", "jarvis dashboard"}:
+        return "study_dashboard", {}
+    match = re.search(r"(?:calculate|what is)\s+([0-9pi e+\-*/().%]+)$", q)
     if not match:
         return None
     return "calculator", {"expression": match.group(1).replace(" ", "")}
@@ -137,8 +140,8 @@ def study_dashboard_tool(args: dict[str, Any]) -> dict[str, Any]:
     tasks = args.get("tasks", [])
     if not all(isinstance(v, list) for v in (subjects, notes, tasks)):
         raise ValueError("dashboard data must be lists")
-    completed = sum(1 for t in tasks if isinstance(t, dict) and str(t.get("status", "")).lower() in {"done", "completed"})
-    pending = [t for t in tasks if isinstance(t, dict) and str(t.get("status", "")).lower() not in {"done", "completed"}]
+    completed = sum(1 for t in tasks if isinstance(t, dict) and (t.get("completed") in {1, True, "1", "true"} or str(t.get("status", "")).lower() in {"done", "completed"}))
+    pending = [t for t in tasks if isinstance(t, dict) and not (t.get("completed") in {1, True, "1", "true"} or str(t.get("status", "")).lower() in {"done", "completed"})]
     return {
         "subjects": [str(s)[:100] for s in subjects[:20]],
         "note_count": len(notes),
