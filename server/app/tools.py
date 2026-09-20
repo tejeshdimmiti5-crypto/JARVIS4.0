@@ -74,6 +74,7 @@ def calculator_tool(args: dict[str, Any]) -> dict[str, Any]:
 
 TOOLS: dict[str, ToolDefinition] = {\n    "study_summary": ToolDefinition(name="study_summary", description="Summarize the supplied study subject list.", handler=study_summary_tool),
     "progress_summary": ToolDefinition(name="progress_summary", description="Summarize study task completion progress.", handler=progress_summary_tool),
+    "planner_summary": ToolDefinition(name="planner_summary", description="Show pending study tasks for planning.", handler=planner_summary_tool),
     "notes_summary": ToolDefinition(name="notes_summary", description="Summarize a supplied list of saved notes.", handler=notes_summary_tool),
     "time": ToolDefinition(
         name="time",
@@ -136,4 +137,14 @@ def run_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
     tool = TOOLS.get(name)
     if tool is None:
         raise KeyError(f"Unknown tool: {name}")
-    return tool.handler(args)
+    return tool.handler(args)\ndef planner_summary_tool(args: dict[str, Any]) -> dict[str, Any]:
+    tasks = args.get("tasks", [])
+    if not isinstance(tasks, list):
+        raise ValueError("tasks must be a list")
+    pending = [t for t in tasks if isinstance(t, dict) and str(t.get("status", "")).lower() not in {"done", "completed"}]
+    return {
+        "pending_tasks": len(pending),
+        "tasks": [str(t.get("title", ""))[:120] for t in pending[:10]],
+    }
+
+
