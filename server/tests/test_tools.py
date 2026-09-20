@@ -47,14 +47,14 @@ def test_study_summary_tool():
     result = run_tool("study_summary", {"subjects": ["AI", "DSA"]})
     assert result["subject_count"] == 2
 \n\ndef test_progress_summary_tool():
-    result = run_tool("progress_summary", {"tasks": [{"status": "completed"}, {"status": "pending"}]})
+    result = run_tool("progress_summary", {"tasks": [{"completed": 1}, {"completed": 0}]})
     assert result["total_tasks"] == 2
     assert result["completed_tasks"] == 1
     assert result["completion_percent"] == 50.0
 
 
 def test_planner_summary_tool():
-    result = run_tool("planner_summary", {"tasks": [{"title": "DSA", "status": "pending"}, {"title": "ML", "status": "done"}]})
+    result = run_tool("planner_summary", {"tasks": [{"title": "DSA", "completed": 0}, {"title": "ML", "completed": 1}]})
     assert result["pending_tasks"] == 1
     assert result["tasks"] == ["DSA"]
 
