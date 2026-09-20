@@ -79,7 +79,7 @@ def progress_summary_tool(args: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(tasks, list):
         raise ValueError("tasks must be a list")
     total = len(tasks)
-    completed = sum(1 for t in tasks if isinstance(t, dict) and (t.get("completed") == 1 or str(t.get("status", "")).lower() in {"done", "completed"}))
+    completed = sum(1 for t in tasks if isinstance(t, dict) and (t.get("completed") in {1, True, "1", "true"} or str(t.get("status", "")).lower() in {"done", "completed"}))
     return {"total_tasks": total, "completed_tasks": completed, "completion_percent": round((completed / total) * 100, 1) if total else 0}
 
 
@@ -87,7 +87,7 @@ def planner_summary_tool(args: dict[str, Any]) -> dict[str, Any]:
     tasks = args.get("tasks", [])
     if not isinstance(tasks, list):
         raise ValueError("tasks must be a list")
-    pending = [t for t in tasks if isinstance(t, dict) and not (t.get("completed") == 1 or str(t.get("status", "")).lower() in {"done", "completed"})]
+    pending = [t for t in tasks if isinstance(t, dict) and not (t.get("completed") in {1, True, "1", "true"} or str(t.get("status", "")).lower() in {"done", "completed"})]
     return {"pending_tasks": len(pending), "tasks": [str(t.get("title", ""))[:120] for t in pending[:10]]}
 
 
