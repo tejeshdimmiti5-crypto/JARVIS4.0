@@ -120,3 +120,9 @@ def test_document_access_is_owner_scoped():
     assert client.get('/api/documents/owner-only-test-document/search?q=test',headers=other).status_code==404
     assert client.post('/api/chat',headers=other,json={'question':'Explain this','document_id':'owner-only-test-document'}).status_code==404
     assert client.post('/api/flashcards/generate',headers=other,json={'topic':'Private PDF','document_id':'owner-only-test-document'}).status_code==404
+
+
+def test_chat_executes_safe_calculator_tool():
+    r=client.post("/api/chat", json={"question": "calculate 25 * 4"})
+    assert r.status_code == 200
+    assert "100" in r.json()["answer"]
