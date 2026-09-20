@@ -1,6 +1,6 @@
-# StudentAI Backend
+# JARVIS Backend
 
-FastAPI service for the StudentAI study assistant.
+FastAPI service for the JARVIS study assistant.
 
 ## Run locally
 
