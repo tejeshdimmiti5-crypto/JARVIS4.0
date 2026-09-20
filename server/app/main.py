@@ -186,6 +186,22 @@ def delete_flashcard(card_id:int,user:User=Depends(current_user),db:Session=Depe
  db.delete(card);db.commit();return {'deleted':True}
 @app.get('/api/analytics/daily')
 def analytics_daily(days:int=7,user:User=Depends(current_user),db:Session=Depends(db_session)):return daily_summary(db,user.id,days)
+@app.get('/api/preferences')
+def get_preferences(user:User=Depends(current_user),db:Session=Depends(db_session)):
+ pref=db.scalar(select(UserPreference).where(UserPreference.user_id==user.id))
+ if not pref:
+  pref=UserPreference(user_id=user.id)
+  db.add(pref);db.commit();db.refresh(pref)
+ return {'daily_minutes':pref.daily_minutes,'focus_subject':pref.focus_subject}
+
+@app.put('/api/preferences')
+def update_preferences(payload:dict[str,Any],user:User=Depends(current_user),db:Session=Depends(db_session)):
+ pref=db.scalar(select(UserPreference).where(UserPreference.user_id==user.id))
+ if not pref: pref=UserPreference(user_id=user.id);db.add(pref)
+ if 'daily_minutes' in payload: pref.daily_minutes=max(15,min(int(payload['daily_minutes']),720))
+ if 'focus_subject' in payload: pref.focus_subject=str(payload['focus_subject'])[:100]
+ db.commit();db.refresh(pref)
+ return {'daily_minutes':pref.daily_minutes,'focus_subject':pref.focus_subject}
 @app.get('/api/subjects')
 def list_subjects(user:User=Depends(current_user),db:Session=Depends(db_session)):
  return [{'id':s.id,'name':s.name,'code':s.code,'daily_minutes':s.daily_minutes,'exam_date':s.exam_date.isoformat() if s.exam_date else None} for s in db.scalars(select(Subject).where(Subject.user_id==user.id).order_by(Subject.name)).all()]
