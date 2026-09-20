@@ -37,3 +37,8 @@ def test_time_tool():
 def test_natural_language_time_tool():
     from app.tools import tool_for_text
     assert tool_for_text("what time is it") == ("time", {})
+
+def test_time_tool_timezone():
+    result = run_tool("time", {"timezone": "Asia/Kolkata"})
+    assert result["timezone"] == "Asia/Kolkata"
+    assert len(result["time"]) == 8
