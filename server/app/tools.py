@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import math
 import operator
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -55,12 +56,22 @@ def _calculate_expression(expression: str) -> float | int:
     return result
 
 
+def time_tool(args: dict[str, Any]) -> dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    return {"utc": now.isoformat(), "date": now.date().isoformat(), "time": now.strftime("%H:%M:%S")}
+
+
 def calculator_tool(args: dict[str, Any]) -> dict[str, Any]:
     expression = str(args.get("expression", ""))
     return {"expression": expression, "result": _calculate_expression(expression)}
 
 
 TOOLS: dict[str, ToolDefinition] = {
+    "time": ToolDefinition(
+        name="time",
+        description="Return the current UTC date and time.",
+        handler=time_tool,
+    ),
     "calculator": ToolDefinition(
         name="calculator",
         description="Safely evaluate basic arithmetic expressions without executing arbitrary code.",
@@ -75,7 +86,10 @@ def list_tools() -> list[dict[str, str]]:
 
 def tool_for_text(text: str) -> tuple[str, dict[str, Any]] | None:
     import re
-    match = re.search(r"(?:calculate|what is)\s+([0-9pi e+\-*/().%]+)$", text.strip().lower())
+    q = text.strip().lower()
+    if q in {"time", "what time is it", "current time", "date today", "what is today"}:
+        return "time", {}
+    match = re.search(r"(?:calculate|what is)\s+([0-9pi e+\-*/().%]+)$", q)
     if not match:
         return None
     return "calculator", {"expression": match.group(1).replace(" ", "")}
