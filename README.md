@@ -1,31 +1,60 @@
-# JARVIS — Personal AI Study & Productivity Assistant
+# JARVIS 4.0 — Personal AI Study & Productivity Assistant
 
-JARVIS is the upgraded identity of this full-stack AI assistant. It combines React + Vite, FastAPI, Gemini, PDF/RAG retrieval, PostgreSQL/SQLite, ChromaDB, authentication, notes, quizzes, flashcards, study planning and progress tracking.
+JARVIS 4.0 is a full-stack personal AI assistant built for study, coding, documents and productivity. Its architecture is inspired by the composable ideas behind local-first systems such as OpenJarvis, while keeping JARVIS focused on a student's workflow.
 
-## Features
+## Architecture
 
-- Gemini AI conversation with offline fallback
-- Authenticated PDF upload, extraction and page-aware retrieval
-- Semantic RAG with ChromaDB + Gemini embeddings
-- Exam-ready summaries, notes and quizzes
-- AI flashcards with review tracking
+```text
+React + Vite UI
+      ↓
+FastAPI API
+      ↓
+JARVIS Agent Router
+      ├── Study
+      ├── PDF / RAG
+      ├── Quiz
+      ├── Planner
+      ├── Coding
+      └── General
+      ↓
+Tools + Memory
+      ├── Safe calculator tool
+      ├── Notes / chat history
+      ├── Study analytics
+      └── Chroma document retrieval
+      ↓
+AI Engine
+      ├── Gemini
+      ├── Ollama / local models
+      └── Offline fallback
+```
+
+## Current features
+
+- JARVIS agent routing for study, PDF, quiz, planner, coding and general requests
+- Gemini cloud AI with a pluggable Ollama local-engine path
+- Safe calculator tool registry; no arbitrary shell execution
+- Authenticated PDF upload and page-aware RAG retrieval
+- ChromaDB semantic retrieval with lexical fallback
+- Exam-ready summaries, notes, quizzes and flashcards
 - Persistent chat history and personal notes
-- Subject management and 7-day study planner
-- Study analytics and streak tracking
-- JWT authentication + Argon2 password hashing
-- Docker Compose development stack
-- Production frontend/backend container support
+- Subject management and study planning
+- Progress analytics and study events
+- JWT authentication with Argon2 password hashing
+- User-scoped document isolation
+- Docker Compose development and production stacks
+- GitHub Actions CI for backend, frontend and Docker builds
 
 ## Windows setup
 
-Clone:
+Clone the current repository:
 
 ```powershell
-git clone https://github.com/tejeshdimmiti5-crypto/chartbot___1.git
-cd chartbot___1
+git clone https://github.com/tejeshdimmiti5-crypto/JARVIS4.0.git
+cd JARVIS4.0
 ```
 
-Backend:
+### Backend
 
 ```powershell
 cd server
@@ -37,44 +66,76 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-Set `server/.env` with your Gemini key and a strong JWT secret. The `alembic upgrade head` command creates/updates the local JARVIS database before the API starts.
+Set `GEMINI_API_KEY` and a strong `JWT_SECRET` in `server/.env` for cloud AI.
 
-Frontend (second PowerShell):
+### Optional local AI
+
+Install Ollama and pull a model, then configure:
+
+```env
+AI_ENGINE=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+```
+
+For automatic selection:
+
+```env
+AI_ENGINE=auto
+```
+
+JARVIS uses Gemini when `GEMINI_API_KEY` is available and otherwise can use the configured Ollama endpoint.
+
+### Frontend
+
+Open a second PowerShell:
 
 ```powershell
-cd chartbot___1/frontend
+cd frontend
 npm install
 npm run dev
 ```
 
-Open the Vite URL, normally http://localhost:5173.
+Open the Vite URL, normally `http://localhost:5173`.
 
-Docker option from repository root:
+### Docker
+
+From the repository root:
 
 ```powershell
 docker compose up --build
 ```
 
-Docker automatically applies database migrations before starting the backend.
-
-Swagger: http://localhost:8000/docs
-
-## Security
-
-- PDF uploads require an authenticated JARVIS session.
-- Documents, document search, PDF study and document flashcards are scoped to the owning user.
-- Never commit `.env`, API keys, passwords, tokens or database credentials.
-
-## Production
-
-The production Compose stack builds the React frontend behind Nginx and proxies `/api/*` to FastAPI. Set `POSTGRES_PASSWORD`, `GEMINI_API_KEY`, `JWT_SECRET`, and `ALLOWED_ORIGINS` before starting:
+The production stack is:
 
 ```powershell
-$env:POSTGRES_PASSWORD='use-a-strong-password'
-$env:GEMINI_API_KEY='your-gemini-key'
-$env:JWT_SECRET='use-a-random-secret-at-least-32-characters'
-$env:ALLOWED_ORIGINS='http://your-frontend-origin'
 docker compose -f docker-compose.prod.yml up --build -d
 ```
 
-The repository remains `chartbot___1` until local verification is complete. After verification, rename it to `JARVIS` in GitHub Settings and update the local `origin` URL.
+Swagger API docs: `http://localhost:8000/docs`
+
+## API highlights
+
+- `GET /api/health`
+- `POST /api/chat`
+- `GET /api/tools`
+- `POST /api/tools/execute`
+- `POST /api/pdf/extract`
+- `POST /api/pdf/study`
+- `GET /api/documents`
+- `GET /api/documents/{document_id}/search`
+- `POST /api/flashcards/generate`
+- `GET /api/analytics/summary`
+- `GET /api/study/tasks`
+
+## Security
+
+- PDF upload and document operations require authentication.
+- Documents are scoped to their owning user.
+- Tool execution is restricted to the registered tool catalog.
+- The calculator uses an AST allowlist and does not execute Python code.
+- Never commit `.env`, API keys, passwords, tokens or database credentials.
+
+## Project direction
+
+JARVIS is being built as a modular personal assistant rather than a single chatbot. The next expansion points are richer memory, additional safe tools, streaming responses, scheduled workflows and deeper local-model support.
