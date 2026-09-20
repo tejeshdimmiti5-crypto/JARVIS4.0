@@ -37,8 +37,11 @@ def offline_answer(q:str)->str:
  if 'big data' in q:return 'Big Data refers to datasets whose volume, velocity, variety, veracity or value create challenges for conventional systems.'
  if 'stack' in q:return 'A stack follows LIFO (Last In, First Out). Common operations are push, pop and peek.'
  return 'JARVIS is running in offline mode. Configure GEMINI_API_KEY on the backend to enable real AI responses.'
-def build_prompt(req:ChatRequest,retrieved:str='',agent_instruction:str='')->str:
- agent=route_agent(req.question,req.task,req.document_id)\n agent_name=agent.name\n agent_instruction=agent.instruction\n task={'answer':'Answer the student clearly and exam-ready.','summary':'Create an exam-ready summary with key concepts, definitions, formulas or steps, and likely questions.','quiz':'Generate 5 MCQs with four options, the correct answer, and a one-line explanation.','notes':'Create concise revision notes with headings and bullet points.','flashcards':'Create 10 study flashcards. Format each as Q: question / A: answer.'}.get(req.task,'Answer the student clearly.')
+def build_prompt(req:ChatRequest,retrieved:str='')->str:
+ agent=route_agent(req.question,req.task,req.document_id)
+ agent_name=agent.name
+ agent_instruction=agent.instruction
+ task={'answer':'Answer the student clearly and exam-ready.','summary':'Create an exam-ready summary with key concepts, definitions, formulas or steps, and likely questions.','quiz':'Generate 5 MCQs with four options, the correct answer, and a one-line explanation.','notes':'Create concise revision notes with headings and bullet points.','flashcards':'Create 10 study flashcards. Format each as Q: question / A: answer.'}.get(req.task,'Answer the student clearly.')
  return f'You are JARVIS, a university study assistant. You are operating as the {agent_name} agent. {agent_instruction}\n{task}\nUse retrieved material when present. Cite supporting pages as [Page N]. Never invent citations.\n\nRETRIEVED:\n{retrieved[:30000]}\n\nQUESTION:\n{req.question}'
 async def gemini(prompt:str)->str:
  if not GEMINI_API_KEY:return ''
