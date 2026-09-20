@@ -24,6 +24,8 @@ def route_agent(question: str, task: str = "answer", document_id: str | None = N
     """Choose a lightweight JARVIS agent without requiring a second model call."""
     if document_id:
         return AGENTS["pdf"]
+    if task == "tool":
+        return AGENTS["tools"]
     if any(x in q for x in ("calculate", "calculator", "what is", "how much is")) and any(ch.isdigit() for ch in q):
         return AGENTS["tools"]
 
