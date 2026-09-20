@@ -9,4 +9,7 @@ if [ "${ENVIRONMENT:-development}" = "production" ]; then
   fi
 fi
 
+echo "JARVIS: applying database migrations..."
+alembic upgrade head
+
 exec "$@"
