@@ -106,12 +106,13 @@ async def run_tool_command(question:str,user:User|None=None,db:Session|None=None
  name,args=parsed
  try:
   if name=="study_summary" and user and db:
-  args={"subjects":[s.name for s in db.scalars(select(Subject).where(Subject.user_id==user.id)).all()]}
- if name=="notes_summary" and user and db:
-  args={"notes":[n.title for n in db.scalars(select(StudyNote).where(StudyNote.user_id==user.id).all())]}
- result=run_tool(name,args)
- return f"Tool {name} result: {result}"
- except (KeyError,ValueError):return None
+   args={"subjects":[s.name for s in db.scalars(select(Subject).where(Subject.user_id==user.id)).all()]}
+  if name=="notes_summary" and user and db:
+   args={"notes":[n.title for n in db.scalars(select(StudyNote).where(StudyNote.user_id==user.id)).all()]}
+  result=run_tool(name,args)
+  return f"Tool {name} result: {result}"
+ except (KeyError,ValueError):
+  return None
 
 async def run_chat(req:ChatRequest,user:User|None=None,db:Session|None=None)->tuple[str,list[dict[str,Any]]]:
  sources=[];retrieved=req.context
