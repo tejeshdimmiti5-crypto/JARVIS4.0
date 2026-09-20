@@ -129,9 +129,7 @@ def focus_recommendation_tool(args: dict[str, Any]) -> dict[str, Any]:
     pending.sort(key=lambda t: (str(t.get("task_date", "")), -int(t.get("minutes", 0) or 0)))
     preferred = str(args.get("focus_subject", "")).strip().lower()
     if preferred:
-        preferred_tasks = [t for t in pending if preferred in str(t.get("title", "")).lower() or preferred in str(t.get("subject", "")).lower()]
-        if preferred_tasks:
-            pending = preferred_tasks + [t for t in pending if t not in preferred_tasks]
+        pending.sort(key=lambda t: (0 if str(t.get("subject", "")).strip().lower() == preferred else 1))
     focus = pending[0] if pending else None
     from datetime import date
     today = date.today().isoformat()
