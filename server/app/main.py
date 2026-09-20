@@ -94,7 +94,7 @@ async def run_chat(req:ChatRequest)->tuple[str,list[dict[str,Any]]]:
   if hits:
    sources=[{'page':h.page,'preview':h.text[:240]} for h in hits] if hasattr(hits[0],'text') else [{'page':h['page'],'preview':h['text'][:240],'distance':h.get('distance')} for h in hits]
    retrieved='\n\n'.join(f'[Page {h.page}]\n{h.text}' for h in hits) if hasattr(hits[0],'text') else '\n\n'.join(f"[Page {h['page']}]\n{h['text']}" for h in hits)
- a=await gemini(build_prompt(req,retrieved,agent.instruction));return (a or offline_answer(req.question)),sources
+ a=await gemini(build_prompt(req,retrieved));return (a or offline_answer(req.question)),sources
 @app.post('/api/chat',response_model=ChatResponse)
 async def chat(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
  if req.document_id:
