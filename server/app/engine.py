@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import os
 
 import httpx
 from fastapi import HTTPException
 
+
+logger = logging.getLogger(__name__)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
@@ -29,22 +32,45 @@ async def generate_text(prompt: str) -> tuple[str, str]:
     gemini_model = os.getenv("GEMINI_MODEL", GEMINI_MODEL)
     ollama_base_url = os.getenv("OLLAMA_BASE_URL", OLLAMA_BASE_URL)
     ollama_model = os.getenv("OLLAMA_MODEL", OLLAMA_MODEL)
+
     if engine == "gemini":
         if not gemini_key:
             return "", "offline"
+
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent"
-        async with httpx.AsyncClient(timeout=90) as client:
-            response = await client.post(
-                url,
-                params={"key": gemini_key},
-                json={"contents": [{"parts": [{"text": prompt}]}]},
-            )
+
+        try:
+            async with httpx.AsyncClient(timeout=90) as client:
+                response = await client.post(
+                    url,
+                    headers={"x-goog-api-key": gemini_key},
+                    json={"contents": [{"parts": [{"text": prompt}]}]},
+                )
+        except httpx.HTTPError as exc:
+            logger.error("Gemini connection error: %s", exc)
+            raise HTTPException(502, "Gemini connection failed") from exc
+
         if response.status_code >= 400:
+            safe_body = response.text[:1000].replace(gemini_key, "[REDACTED]")
+            logger.error(
+                "Gemini request failed: status=%s model=%s body=%s",
+                response.status_code,
+                gemini_model,
+                safe_body,
+            )
             raise HTTPException(502, "Gemini request failed")
-        parts = response.json().get("candidates", [{}])[0].get("content", {}).get("parts", [])
+
+        try:
+            parts = response.json().get("candidates", [{}])[0].get("content", {}).get("parts", [])
+        except ValueError as exc:
+            logger.error("Gemini returned invalid JSON: status=%s", response.status_code)
+            raise HTTPException(502, "Gemini returned invalid response") from exc
+
         answer = "".join(part.get("text", "") for part in parts).strip()
         if not answer:
+            logger.error("Gemini returned an empty response: model=%s", gemini_model)
             raise HTTPException(502, "Gemini returned an empty response")
+
         return answer, gemini_model
 
     if engine == "ollama":
@@ -52,7 +78,11 @@ async def generate_text(prompt: str) -> tuple[str, str]:
             async with httpx.AsyncClient(timeout=120) as client:
                 response = await client.post(
                     f"{ollama_base_url.rstrip('/')}/api/chat",
-                    json={"model": ollama_model, "messages": [{"role": "user", "content": prompt}], "stream": False},
+                    json={
+                        "model": ollama_model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "stream": False,
+                    },
                 )
             if response.status_code >= 400:
                 raise HTTPException(502, "Ollama request failed")
