@@ -1,4 +1,4 @@
-"""create StudentAI schema
+"""create JARVIS schema
 
 Revision ID: 0001_initial
 Revises:
