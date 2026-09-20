@@ -73,6 +73,7 @@ def calculator_tool(args: dict[str, Any]) -> dict[str, Any]:
 
 
 TOOLS: dict[str, ToolDefinition] = {\n    "study_summary": ToolDefinition(name="study_summary", description="Summarize the supplied study subject list.", handler=study_summary_tool),
+    "progress_summary": ToolDefinition(name="progress_summary", description="Summarize study task completion progress.", handler=progress_summary_tool),
     "notes_summary": ToolDefinition(name="notes_summary", description="Summarize a supplied list of saved notes.", handler=notes_summary_tool),
     "time": ToolDefinition(
         name="time",
@@ -101,6 +102,15 @@ def notes_summary_tool(args: dict[str, Any]) -> dict[str, Any]:
     return {"note_count": len(notes), "notes": [str(n)[:200] for n in notes[:10]]}
 
 
+def progress_summary_tool(args: dict[str, Any]) -> dict[str, Any]:
+    tasks = args.get("tasks", [])
+    if not isinstance(tasks, list):
+        raise ValueError("tasks must be a list")
+    total = len(tasks)
+    completed = sum(1 for t in tasks if isinstance(t, dict) and str(t.get("status", "")).lower() in {"done", "completed"})
+    return {"total_tasks": total, "completed_tasks": completed, "completion_percent": round((completed / total) * 100, 1) if total else 0}
+
+
 def list_tools() -> list[dict[str, str]]:
     return [{"name": tool.name, "description": tool.description} for tool in TOOLS.values()]
 
@@ -114,6 +124,8 @@ def tool_for_text(text: str) -> tuple[str, dict[str, Any]] | None:
         return "study_summary", {"subjects": []}
     if q in {"show my notes", "my notes", "list my notes"}:
         return "notes_summary", {"notes": []}
+    if q in {"show my progress", "my progress", "study progress", "how am i doing"}:
+        return "progress_summary", {"tasks": []}
     match = re.search(r"(?:calculate|what is)\s+([0-9pi e+\-*/().%]+)$", q)
     if not match:
         return None
