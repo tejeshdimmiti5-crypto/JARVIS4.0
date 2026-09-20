@@ -5,7 +5,7 @@ JARVIS is the upgraded identity of this full-stack AI assistant. It combines Rea
 ## Features
 
 - Gemini AI conversation with offline fallback
-- PDF upload, extraction and page-aware retrieval
+- Authenticated PDF upload, extraction and page-aware retrieval
 - Semantic RAG with ChromaDB + Gemini embeddings
 - Exam-ready summaries, notes and quizzes
 - AI flashcards with review tracking
@@ -61,8 +61,20 @@ Swagger: http://localhost:8000/docs
 
 ## Security
 
-Never commit `.env`, API keys, passwords, tokens or database credentials.
+- PDF uploads require an authenticated JARVIS session.
+- Documents, document search, PDF study and document flashcards are scoped to the owning user.
+- Never commit `.env`, API keys, passwords, tokens or database credentials.
 
-## Repository name
+## Production
 
-The repository is intentionally still named `chartbot___1` until local verification is complete. It can then be renamed to JARVIS without losing the Git history.
+The production Compose stack builds the React frontend behind Nginx and proxies `/api/*` to FastAPI. Set `POSTGRES_PASSWORD`, `GEMINI_API_KEY`, `JWT_SECRET`, and `ALLOWED_ORIGINS` before starting:
+
+```powershell
+$env:POSTGRES_PASSWORD='use-a-strong-password'
+$env:GEMINI_API_KEY='your-gemini-key'
+$env:JWT_SECRET='use-a-random-secret-at-least-32-characters'
+$env:ALLOWED_ORIGINS='http://your-frontend-origin'
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+The repository remains `chartbot___1` until local verification is complete. After verification, rename it to `JARVIS` in GitHub Settings and update the local `origin` URL.
