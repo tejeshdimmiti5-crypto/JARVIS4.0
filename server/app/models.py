@@ -41,3 +41,12 @@ class DocumentRecord(Base):
     filename:Mapped[str]=mapped_column(String(255),default='document.pdf')
     pages:Mapped[int]=mapped_column(Integer,default=0)
     created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
+
+
+class UserPreference(Base):
+    __tablename__='user_preferences'
+    id:Mapped[int]=mapped_column(primary_key=True)
+    user_id:Mapped[int]=mapped_column(ForeignKey('users.id'),unique=True,index=True)
+    daily_minutes:Mapped[int]=mapped_column(Integer,default=120)
+    focus_subject:Mapped[str]=mapped_column(String(100),default='')
+    created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
