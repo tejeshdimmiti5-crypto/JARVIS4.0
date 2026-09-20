@@ -94,7 +94,7 @@ def planner_summary_tool(args: dict[str, Any]) -> dict[str, Any]:
 TOOLS: dict[str, ToolDefinition] = {
     "study_summary": ToolDefinition("study_summary", "Summarize the supplied study subject list.", study_summary_tool),
     "progress_summary": ToolDefinition("progress_summary", "Summarize study task completion progress.", progress_summary_tool),
-    "planner_summary": ToolDefinition("planner_summary", "Show pending study tasks for planning.", planner_summary_tool),
+    "planner_summary": ToolDefinition("planner_summary", "Show pending study tasks for planning.", planner_summary_tool),\n    "study_dashboard": ToolDefinition("study_dashboard", "Summarize subjects, notes, and study task progress.", study_dashboard_tool),
     "notes_summary": ToolDefinition("notes_summary", "Summarize a supplied list of saved notes.", notes_summary_tool),
     "time": ToolDefinition("time", "Return the current date and time for a timezone.", time_tool),
     "calculator": ToolDefinition("calculator", "Safely evaluate basic arithmetic expressions.", calculator_tool),
@@ -128,4 +128,20 @@ def run_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
     tool = TOOLS.get(name)
     if tool is None:
         raise KeyError(f"Unknown tool: {name}")
-    return tool.handler(args)
+    return tool.handler(args)\n\ndef study_dashboard_tool(args: dict[str, Any]) -> dict[str, Any]:
+    subjects = args.get("subjects", [])
+    notes = args.get("notes", [])
+    tasks = args.get("tasks", [])
+    if not all(isinstance(v, list) for v in (subjects, notes, tasks)):
+        raise ValueError("dashboard data must be lists")
+    completed = sum(1 for t in tasks if isinstance(t, dict) and str(t.get("status", "")).lower() in {"done", "completed"})
+    pending = [t for t in tasks if isinstance(t, dict) and str(t.get("status", "")).lower() not in {"done", "completed"}]
+    return {
+        "subjects": [str(s)[:100] for s in subjects[:20]],
+        "note_count": len(notes),
+        "task_count": len(tasks),
+        "completed_tasks": completed,
+        "completion_percent": round((completed / len(tasks)) * 100, 1) if tasks else 0,
+        "pending_tasks": [str(t.get("title", ""))[:120] for t in pending[:10]],
+    }
+
