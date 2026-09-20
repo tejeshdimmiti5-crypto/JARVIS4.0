@@ -18,7 +18,7 @@ from .rag import chunk_document,lexical_retrieve
 from .study import PlanInput,make_plan
 from .vector_store import index_chunks,semantic_search
 GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL','gemini-2.0-flash');ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
-app=FastAPI(title='StudentAI API',version='2.0.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Authorization','Content-Type'])
+app=FastAPI(title='JARVIS API',version='2.0.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Authorization','Content-Type'])
 class ChatRequest(BaseModel):question:str=Field(min_length=1,max_length=12000);context:str=Field(default='',max_length=50000);document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
 class ChatResponse(BaseModel):answer:str;model:str;used_ai:bool;sources:list[dict[str,Any]]=Field(default_factory=list)
 class AuthRequest(BaseModel):email:str;password:str
@@ -35,10 +35,10 @@ def offline_answer(q:str)->str:
  if 'supervised' in q:return 'Supervised learning trains a model with labelled examples. Classification predicts categories, while regression predicts numerical values.'
  if 'big data' in q:return 'Big Data refers to datasets whose volume, velocity, variety, veracity or value create challenges for conventional systems.'
  if 'stack' in q:return 'A stack follows LIFO (Last In, First Out). Common operations are push, pop and peek.'
- return 'StudentAI is running in offline mode. Configure GEMINI_API_KEY on the backend to enable real AI responses.'
+ return 'JARVIS is running in offline mode. Configure GEMINI_API_KEY on the backend to enable real AI responses.'
 def build_prompt(req:ChatRequest,retrieved:str='')->str:
  task={'answer':'Answer the student clearly and exam-ready.','summary':'Create an exam-ready summary with key concepts, definitions, formulas or steps, and likely questions.','quiz':'Generate 5 MCQs with four options, the correct answer, and a one-line explanation.','notes':'Create concise revision notes with headings and bullet points.','flashcards':'Create 10 study flashcards. Format each as Q: question / A: answer.'}.get(req.task,'Answer the student clearly.')
- return f'You are StudentAI, a university study assistant. {task}\nUse retrieved material when present. Cite supporting pages as [Page N]. Never invent citations.\n\nRETRIEVED:\n{retrieved[:30000]}\n\nQUESTION:\n{req.question}'
+ return f'You are JARVIS, a university study assistant. {task}\nUse retrieved material when present. Cite supporting pages as [Page N]. Never invent citations.\n\nRETRIEVED:\n{retrieved[:30000]}\n\nQUESTION:\n{req.question}'
 async def gemini(prompt:str)->str:
  if not GEMINI_API_KEY:return ''
  url=f'https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent'
@@ -64,7 +64,7 @@ async def health():
  try:
   with engine.connect() as c:c.exec_driver_sql('SELECT 1');database=True
  except Exception:pass
- return {'status':'ok','service':'StudentAI API','ai_configured':bool(GEMINI_API_KEY),'vector_store':'chroma','database':database}
+ return {'status':'ok','service':'JARVIS API','ai_configured':bool(GEMINI_API_KEY),'vector_store':'chroma','database':database}
 @app.post('/api/auth/register')
 def register(data:AuthRequest,db:Session=Depends(db_session)):
  email=data.email.strip().lower()
