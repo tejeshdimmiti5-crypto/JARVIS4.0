@@ -160,6 +160,12 @@ async def run_chat(req:ChatRequest,user:User|None=None,db:Session|None=None)->tu
   else:
    raise
  return a,sources
+@app.get('/api/chat/history')
+def chat_history(limit:int=100,user:User=Depends(current_user),db:Session=Depends(db_session)):
+ limit=max(1,min(limit,200))
+ rows=db.scalars(select(ChatMessage).where(ChatMessage.user_id==user.id).order_by(ChatMessage.created_at.desc()).limit(limit)).all()
+ rows=list(reversed(rows))
+ return [{'id':r.id,'role':r.role,'content':r.content,'created_at':r.created_at.isoformat() if r.created_at else None} for r in rows]
 @app.post('/api/chat',response_model=ChatResponse)
 async def chat(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
  if req.document_id:
