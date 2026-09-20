@@ -132,7 +132,7 @@ def tool_for_text(text: str) -> tuple[str, dict[str, Any]] | None:
         return "planner_summary", {"tasks": []}
     if q in {"show my dashboard", "my dashboard", "study dashboard", "jarvis dashboard"}:
         return "study_dashboard", {}
-    match = re.search(r"(?:calculate|what is)\\s+([0-9pi e+\\-*/().%]+)$", q)
+    match = re.search(r"(?:calculate|what is)\s+([0-9pi e+\-*/().%]+)$", q)
     if not match:
         return None
     return "calculator", {"expression": match.group(1).replace(" ", "")}
