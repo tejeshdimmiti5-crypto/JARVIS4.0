@@ -1,4 +1,4 @@
-name: StudentAI CI
+name: JARVIS CI
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
     env:
       ENVIRONMENT: test
       DATABASE_URL: sqlite:///./data/ci.db
-      JWT_SECRET: test-secret-for-studentai-ci-32-chars
+      JWT_SECRET: test-secret-for-jarvis-ci-32-chars
       GEMINI_API_KEY: ''
       PYTHONPATH: .
     steps:
@@ -53,10 +53,10 @@ jobs:
           context: ./server
           file: ./server/Dockerfile
           push: false
-          tags: studentai-backend:ci
+          tags: jarvis-backend:ci
       - uses: docker/build-push-action@v6
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: false
-          tags: studentai-frontend:ci
+          tags: jarvis-frontend:ci
