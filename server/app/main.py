@@ -123,7 +123,10 @@ async def run_tool_command(question:str,user:User|None=None,db:Session|None=None
    if pref and pref.focus_subject:
     args["focus_subject"]=pref.focus_subject
 
-  if name=="weekly_review" and user and db:\n   cutoff=datetime.now(timezone.utc)-timedelta(days=7)\n   args={"tasks":[{"completed":t.completed} for t in db.scalars(select(StudyTask).where(StudyTask.user_id==user.id,StudyTask.created_at>=cutoff).all())],"events":[{"minutes":e.minutes} for e in db.scalars(select(StudyEvent).where(StudyEvent.user_id==user.id,StudyEvent.created_at>=cutoff)).all()]}\n  result=run_tool(name,args)
+  if name=="weekly_review" and user and db:
+   cutoff=datetime.now(timezone.utc)-timedelta(days=7)
+   args={"tasks":[{"completed":t.completed} for t in db.scalars(select(StudyTask).where(StudyTask.user_id==user.id,StudyTask.created_at>=cutoff).all())],"events":[{"minutes":e.minutes} for e in db.scalars(select(StudyEvent).where(StudyEvent.user_id==user.id,StudyEvent.created_at>=cutoff)).all()]}
+  result=run_tool(name,args)
   return f"Tool {name} result: {result}"
  except (KeyError,ValueError):
   return None
