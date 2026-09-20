@@ -86,3 +86,8 @@ def test_focus_recommendation_tool():
     result = run_tool("focus_recommendation", {"subjects": ["ML"], "tasks": [{"title": "Revise Unit 1", "completed": 0, "minutes": 45, "task_date": "2026-09-20"}, {"title": "Done", "completed": 1, "minutes": 30, "task_date": "2026-09-20"}]})
     assert result["focus"] == "Revise Unit 1"
     assert result["pending_tasks"] == 1
+
+
+def test_focus_recommendation_prefers_subject():
+    result = run_tool("focus_recommendation", {"subjects":["ML","DSA"],"focus_subject":"ML","tasks":[{"title":"DSA practice","completed":0,"minutes":30,"task_date":"2026-09-20"},{"title":"ML Unit 2","completed":0,"minutes":30,"task_date":"2026-09-21"}]})
+    assert result["focus"] == "ML Unit 2"
