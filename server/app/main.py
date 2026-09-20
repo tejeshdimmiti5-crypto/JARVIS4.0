@@ -19,6 +19,7 @@ from .study import PlanInput,make_plan
 from .vector_store import index_chunks,semantic_search
 from .agents import route_agent
 from .tools import list_tools,run_tool
+from .engine import generate_text,selected_engine,OLLAMA_MODEL
 GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL','gemini-2.0-flash');ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
 app=FastAPI(title='JARVIS API',version='2.0.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Authorization','Content-Type'])
 class ChatRequest(BaseModel):question:str=Field(min_length=1,max_length=12000);context:str=Field(default='',max_length=50000);document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
@@ -46,13 +47,8 @@ def build_prompt(req:ChatRequest,retrieved:str='')->str:
  task={'answer':'Answer the student clearly and exam-ready.','summary':'Create an exam-ready summary with key concepts, definitions, formulas or steps, and likely questions.','quiz':'Generate 5 MCQs with four options, the correct answer, and a one-line explanation.','notes':'Create concise revision notes with headings and bullet points.','flashcards':'Create 10 study flashcards. Format each as Q: question / A: answer.'}.get(req.task,'Answer the student clearly.')
  return f'You are JARVIS, a university study assistant. You are operating as the {agent_name} agent. {agent_instruction}\n{task}\nUse retrieved material when present. Cite supporting pages as [Page N]. Never invent citations.\n\nRETRIEVED:\n{retrieved[:30000]}\n\nQUESTION:\n{req.question}'
 async def gemini(prompt:str)->str:
- if not GEMINI_API_KEY:return ''
- url=f'https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent'
- async with httpx.AsyncClient(timeout=90) as c:r=await c.post(url,params={'key':GEMINI_API_KEY},json={'contents':[{'parts':[{'text':prompt}]}]})
- if r.status_code>=400:raise HTTPException(502,'Gemini request failed')
- parts=r.json().get('candidates',[{}])[0].get('content',{}).get('parts',[]);a=''.join(p.get('text','') for p in parts).strip()
- if not a:raise HTTPException(502,'Gemini returned an empty response')
- return a
+ answer,_=await generate_text(prompt)
+ return answer
 def parse_flashcards(text:str)->list[Flashcard]:
  cards=[];q=None
  for raw in text.splitlines():
@@ -117,7 +113,7 @@ async def chat(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=
   owned_document(db,user,req.document_id)
  a,sources=await run_chat(req)
  if user:db.add_all([ChatMessage(user_id=user.id,role='user',content=req.question),ChatMessage(user_id=user.id,role='assistant',content=a)]);db.commit();event(db,user.id,'question')
- return ChatResponse(answer=a,model=GEMINI_MODEL if GEMINI_API_KEY else 'offline',used_ai=bool(GEMINI_API_KEY),sources=sources)
+ return ChatResponse(answer=a,model=GEMINI_MODEL if selected_engine()=='gemini' else OLLAMA_MODEL if selected_engine()=='ollama' else 'offline',used_ai=bool(GEMINI_API_KEY),sources=sources)
 @app.post('/api/flashcards/generate',response_model=FlashcardResponse)
 async def generate_flashcards(req:FlashcardRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
  if req.document_id:
