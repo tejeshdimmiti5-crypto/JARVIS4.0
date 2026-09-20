@@ -80,3 +80,9 @@ def test_daily_briefing_tool():
     assert result["subject_count"] == 2
     assert result["pending_task_count"] == 1
     assert result["planned_minutes"] == 45
+
+
+def test_focus_recommendation_tool():
+    result = run_tool("focus_recommendation", {"subjects": ["ML"], "tasks": [{"title": "Revise Unit 1", "completed": 0, "minutes": 45, "task_date": "2026-09-20"}, {"title": "Done", "completed": 1, "minutes": 30, "task_date": "2026-09-20"}]})
+    assert result["focus"] == "Revise Unit 1"
+    assert result["pending_tasks"] == 1
