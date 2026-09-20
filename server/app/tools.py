@@ -102,11 +102,30 @@ def study_dashboard_tool(args: dict[str, Any]) -> dict[str, Any]:
     return {"subjects": [str(s)[:100] for s in subjects[:20]], "note_count": len(notes), "task_count": len(tasks), "completed_tasks": completed, "completion_percent": round((completed / len(tasks)) * 100, 1) if tasks else 0, "pending_tasks": [str(t.get("title", ""))[:120] for t in pending[:10]]}
 
 
+def daily_briefing_tool(args: dict[str, Any]) -> dict[str, Any]:
+    subjects = args.get("subjects", [])
+    tasks = args.get("tasks", [])
+    notes = args.get("notes", [])
+    if not all(isinstance(v, list) for v in (subjects, tasks, notes)):
+        raise ValueError("briefing data must be lists")
+    pending = [t for t in tasks if isinstance(t, dict) and not (t.get("completed") in {1, True, "1", "true"} or str(t.get("status", "")).lower() in {"done", "completed"})]
+    total_minutes = sum(int(t.get("minutes", 0) or 0) for t in pending if isinstance(t, dict) and str(t.get("minutes", "")).isdigit())
+    return {
+        "subject_count": len(subjects),
+        "subjects": [str(s)[:100] for s in subjects[:10]],
+        "pending_tasks": [str(t.get("title", ""))[:120] for t in pending[:8]],
+        "pending_task_count": len(pending),
+        "planned_minutes": total_minutes,
+        "note_count": len(notes),
+    }
+
+
 TOOLS: dict[str, ToolDefinition] = {
     "study_summary": ToolDefinition("study_summary", "Summarize the supplied study subject list.", study_summary_tool),
     "progress_summary": ToolDefinition("progress_summary", "Summarize study task completion progress.", progress_summary_tool),
     "planner_summary": ToolDefinition("planner_summary", "Show pending study tasks for planning.", planner_summary_tool),
     "study_dashboard": ToolDefinition("study_dashboard", "Summarize subjects, notes, and study task progress.", study_dashboard_tool),
+    "daily_briefing": ToolDefinition("daily_briefing", "Create a concise daily study briefing from user data.", daily_briefing_tool),
     "notes_summary": ToolDefinition("notes_summary", "Summarize a supplied list of saved notes.", notes_summary_tool),
     "time": ToolDefinition("time", "Return the current date and time for a timezone.", time_tool),
     "calculator": ToolDefinition("calculator", "Safely evaluate basic arithmetic expressions.", calculator_tool),
@@ -132,6 +151,8 @@ def tool_for_text(text: str) -> tuple[str, dict[str, Any]] | None:
         return "planner_summary", {"tasks": []}
     if q in {"show my dashboard", "my dashboard", "study dashboard", "jarvis dashboard"}:
         return "study_dashboard", {}
+    if q in {"daily briefing", "my daily briefing", "morning briefing", "what should i focus on today"}:
+        return "daily_briefing", {}
     match = re.search(r"(?:calculate|what is)\s+([0-9pi e+\-*/().%]+)$", q)
     if not match:
         return None
