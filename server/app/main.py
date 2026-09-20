@@ -11,7 +11,7 @@ from sqlalchemy import delete,func,select
 from sqlalchemy.orm import Session
 from .auth import create_token,current_user,db_session,optional_user,password_hash
 from .db import ChatMessage,StudyNote,User,Base,engine
-from .models import DocumentRecord,StudyEvent,StudyTask,Subject
+from .models import DocumentRecord,StudyEvent,StudyTask,Subject,UserPreference
 from .flashcards import FlashcardRecord
 from .analytics import daily_summary
 from .rag import chunk_document,lexical_retrieve
