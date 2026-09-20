@@ -24,15 +24,15 @@ def selected_engine() -> str:
 
 
 async def generate_text(prompt: str) -> tuple[str, str]:
-    engine = selected_engine()
+    engine = selected_engine()\n    gemini_key = os.getenv("GEMINI_API_KEY", GEMINI_API_KEY)\n    gemini_model = os.getenv("GEMINI_MODEL", GEMINI_MODEL)\n    ollama_base_url = os.getenv("OLLAMA_BASE_URL", OLLAMA_BASE_URL)\n    ollama_model = os.getenv("OLLAMA_MODEL", OLLAMA_MODEL)
     if engine == "gemini":
-        if not GEMINI_API_KEY:
+        if not gemini_key:
             return "", "offline"
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent"
         async with httpx.AsyncClient(timeout=90) as client:
             response = await client.post(
                 url,
-                params={"key": GEMINI_API_KEY},
+                params={"key": gemini_key},
                 json={"contents": [{"parts": [{"text": prompt}]}]},
             )
         if response.status_code >= 400:
@@ -41,20 +41,20 @@ async def generate_text(prompt: str) -> tuple[str, str]:
         answer = "".join(part.get("text", "") for part in parts).strip()
         if not answer:
             raise HTTPException(502, "Gemini returned an empty response")
-        return answer, GEMINI_MODEL
+        return answer, gemini_model
 
     if engine == "ollama":
         try:
             async with httpx.AsyncClient(timeout=120) as client:
                 response = await client.post(
-                    f"{OLLAMA_BASE_URL.rstrip('/')}/api/chat",
-                    json={"model": OLLAMA_MODEL, "messages": [{"role": "user", "content": prompt}], "stream": False},
+                    f"{ollama_base_url.rstrip('/')}/api/chat",
+                    json={"model": ollama_model, "messages": [{"role": "user", "content": prompt}], "stream": False},
                 )
             if response.status_code >= 400:
                 raise HTTPException(502, "Ollama request failed")
             answer = response.json().get("message", {}).get("content", "").strip()
             if answer:
-                return answer, OLLAMA_MODEL
+                return answer, ollama_model
         except HTTPException:
             raise
         except httpx.HTTPError:
