@@ -33,10 +33,11 @@ python -m venv .venv
 .venv\\Scripts\\Activate.ps1
 pip install -r requirements.txt
 copy .env.example .env
+alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-Set `server/.env` with your Gemini key and a strong JWT secret.
+Set `server/.env` with your Gemini key and a strong JWT secret. The `alembic upgrade head` command creates/updates the local JARVIS database before the API starts.
 
 Frontend (second PowerShell):
 
@@ -53,6 +54,8 @@ Docker option from repository root:
 ```powershell
 docker compose up --build
 ```
+
+Docker automatically applies database migrations before starting the backend.
 
 Swagger: http://localhost:8000/docs
 
