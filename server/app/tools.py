@@ -75,7 +75,7 @@ def list_tools() -> list[dict[str, str]]:
 
 def tool_for_text(text: str) -> tuple[str, dict[str, Any]] | None:
     import re
-    match = re.search(r"(?:calculate|what is)\\s+([0-9pi e+\\-*/().%]+)$", text.strip().lower())
+    match = re.search(r"(?:calculate|what is)\s+([0-9pi e+\-*/().%]+)$", text.strip().lower())
     if not match:
         return None
     return "calculator", {"expression": match.group(1).replace(" ", "")}
