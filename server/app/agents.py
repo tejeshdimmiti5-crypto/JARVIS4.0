@@ -26,10 +26,9 @@ def route_agent(question: str, task: str = "answer", document_id: str | None = N
         return AGENTS["pdf"]
     if task == "tool":
         return AGENTS["tools"]
+    q = question.lower()
     if any(x in q for x in ("calculate", "calculator", "what is", "how much is")) and any(ch.isdigit() for ch in q):
         return AGENTS["tools"]
-
-    q = question.lower()
     if task == "quiz" or any(x in q for x in ("quiz", "mcq", "multiple choice", "test me")):
         return AGENTS["quiz"]
     if task in {"summary", "notes", "flashcards"} or any(x in q for x in ("study", "exam", "explain", "summarize", "notes", "flashcard")):
