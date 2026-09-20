@@ -103,7 +103,7 @@ async def run_chat(req:ChatRequest,user:User|None=None,db:Session|None=None)->tu
  sources=[];retrieved=req.context
  if user and db:
   remembered=memory_context(db,user)
-  if remembered:retrieved=(retrieved+'\\n\\n'+remembered).strip()
+  if remembered:retrieved=(retrieved+'\n\n'+remembered).strip()
  if req.use_retrieval:
   hits=[]
   if req.document_id and req.semantic and GEMINI_API_KEY:
