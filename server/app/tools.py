@@ -72,7 +72,7 @@ def calculator_tool(args: dict[str, Any]) -> dict[str, Any]:
     return {"expression": expression, "result": _calculate_expression(expression)}
 
 
-TOOLS: dict[str, ToolDefinition] = {
+TOOLS: dict[str, ToolDefinition] = {\n    "study_summary": ToolDefinition(name="study_summary", description="Summarize the supplied study subject list.", handler=study_summary_tool),
     "time": ToolDefinition(
         name="time",
         description="Return the current UTC date and time.",
@@ -84,6 +84,13 @@ TOOLS: dict[str, ToolDefinition] = {
         handler=calculator_tool,
     ),
 }
+
+
+def study_summary_tool(args: dict[str, Any]) -> dict[str, Any]:
+    subjects = args.get("subjects", [])
+    if not isinstance(subjects, list):
+        raise ValueError("subjects must be a list")
+    return {"subject_count": len(subjects), "subjects": [str(s)[:100] for s in subjects[:20]]}
 
 
 def list_tools() -> list[dict[str, str]]:
