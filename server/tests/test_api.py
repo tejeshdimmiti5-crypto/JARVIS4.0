@@ -118,3 +118,5 @@ def test_document_access_is_owner_scoped():
     assert other_docs.status_code==200
     assert all(x['document_id']!='owner-only-test-document' for x in other_docs.json())
     assert client.get('/api/documents/owner-only-test-document/search?q=test',headers=other).status_code==404
+    assert client.post('/api/chat',headers=other,json={'question':'Explain this','document_id':'owner-only-test-document'}).status_code==404
+    assert client.post('/api/flashcards/generate',headers=other,json={'topic':'Private PDF','document_id':'owner-only-test-document'}).status_code==404
