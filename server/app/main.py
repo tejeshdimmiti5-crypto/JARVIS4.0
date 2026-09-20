@@ -287,7 +287,9 @@ async def extract_pdf(file:UploadFile=File(...),user:User=Depends(current_user),
  try:
   doc=fitz.open(stream=BytesIO(raw),filetype='pdf')
   if doc.page_count>500:raise HTTPException(413,'PDF must contain 500 pages or fewer')
-  pages=[p.get_text('text') for p in doc];text='\n\n'.join(f'PAGE {i+1}\n{v}' for i,v in enumerate(pages)).strip();did=str(uuid.uuid4());chunks=chunk_document(text);indexed=0
+  pages=[p.get_text('text') for p in doc];doc.close();text='\n\n'.join(f'PAGE {i+1}\n{v}' for i,v in enumerate(pages)).strip()
+  if not text or not any(v.strip() for v in pages):raise HTTPException(422,'This PDF contains no selectable text. Upload a text-based PDF or run OCR first.')
+  did=str(uuid.uuid4());chunks=chunk_document(text);indexed=0
   if GEMINI_API_KEY:
    try:indexed=await index_chunks(did,[{'page':c.page,'text':c.text} for c in chunks])
    except Exception:pass
