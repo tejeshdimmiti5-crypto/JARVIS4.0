@@ -94,7 +94,8 @@ def planner_summary_tool(args: dict[str, Any]) -> dict[str, Any]:
 TOOLS: dict[str, ToolDefinition] = {
     "study_summary": ToolDefinition("study_summary", "Summarize the supplied study subject list.", study_summary_tool),
     "progress_summary": ToolDefinition("progress_summary", "Summarize study task completion progress.", progress_summary_tool),
-    "planner_summary": ToolDefinition("planner_summary", "Show pending study tasks for planning.", planner_summary_tool),\n    "study_dashboard": ToolDefinition("study_dashboard", "Summarize subjects, notes, and study task progress.", study_dashboard_tool),
+    "planner_summary": ToolDefinition("planner_summary", "Show pending study tasks for planning.", planner_summary_tool),
+    "study_dashboard": ToolDefinition("study_dashboard", "Summarize subjects, notes, and study task progress.", study_dashboard_tool),
     "notes_summary": ToolDefinition("notes_summary", "Summarize a supplied list of saved notes.", notes_summary_tool),
     "time": ToolDefinition("time", "Return the current date and time for a timezone.", time_tool),
     "calculator": ToolDefinition("calculator", "Safely evaluate basic arithmetic expressions.", calculator_tool),
@@ -128,7 +129,9 @@ def run_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
     tool = TOOLS.get(name)
     if tool is None:
         raise KeyError(f"Unknown tool: {name}")
-    return tool.handler(args)\n\ndef study_dashboard_tool(args: dict[str, Any]) -> dict[str, Any]:
+    return tool.handler(args)
+
+def study_dashboard_tool(args: dict[str, Any]) -> dict[str, Any]:
     subjects = args.get("subjects", [])
     notes = args.get("notes", [])
     tasks = args.get("tasks", [])
