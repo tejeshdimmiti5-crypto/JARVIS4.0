@@ -8,7 +8,7 @@ _client=chromadb.PersistentClient(path=DB_PATH);_collection=_client.get_or_creat
 async def embed(text:str)->list[float]:
  if not GEMINI_API_KEY:raise RuntimeError('GEMINI_API_KEY is required for semantic indexing')
  url=f'https://generativelanguage.googleapis.com/v1beta/models/{EMBEDDING_MODEL}:embedContent';payload={'model':f'models/{EMBEDDING_MODEL}','content':{'parts':[{'text':text}]}}
- async with httpx.AsyncClient(timeout=60) as client:r=await client.post(url,params={'key':GEMINI_API_KEY},json=payload)
+ async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=15.0)) as client:r=await client.post(url,headers={'x-goog-api-key':GEMINI_API_KEY},json=payload)
  if r.status_code>=400:raise RuntimeError(r.text[:500])
  return r.json()['embedding']['values']
 async def index_chunks(document_id:str,chunks:list[dict[str,Any]])->int:
