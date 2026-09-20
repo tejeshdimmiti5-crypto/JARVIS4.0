@@ -127,6 +127,11 @@ def focus_recommendation_tool(args: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("recommendation data must be lists")
     pending = [t for t in tasks if isinstance(t, dict) and not (t.get("completed") in {1, True, "1", "true"} or str(t.get("status", "")).lower() in {"done", "completed"})]
     pending.sort(key=lambda t: (str(t.get("task_date", "")), -int(t.get("minutes", 0) or 0)))
+    preferred = str(args.get("focus_subject", "")).strip().lower()
+    if preferred:
+        preferred_tasks = [t for t in pending if preferred in str(t.get("title", "")).lower() or preferred in str(t.get("subject", "")).lower()]
+        if preferred_tasks:
+            pending = preferred_tasks + [t for t in pending if t not in preferred_tasks]
     focus = pending[0] if pending else None
     from datetime import date
     today = date.today().isoformat()
