@@ -2,6 +2,13 @@
 
 > **Personal AI Study & Productivity Command Center**
 
+## 🌐 Live Website
+
+### 👉 [**Visit JARVIS 4.0**](https://jarvis-ui-6eu8.onrender.com)
+
+**Live app:** https://jarvis-ui-6eu8.onrender.com  
+**Source code:** https://github.com/tejeshdimmiti5-crypto/JARVIS4.0
+
 JARVIS 4.0 is a full-stack AI study assistant designed to help students **learn, revise, organize, and track progress** from one workspace.
 
 It combines a React/Vite interface, FastAPI backend, PostgreSQL persistence, document retrieval/RAG, Gemini or Ollama AI, authentication, study planning, flashcards, notes, quizzes, and analytics.
@@ -116,17 +123,9 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-Backend:
+Backend: `http://localhost:8000`
 
-```text
-http://localhost:8000
-```
-
-API documentation:
-
-```text
-http://localhost:8000/docs
-```
+API documentation: `http://localhost:8000/docs`
 
 ### 3. Start the frontend
 
@@ -138,11 +137,7 @@ npm install
 npm run dev
 ```
 
-Frontend normally runs at:
-
-```text
-http://localhost:5173
-```
+Frontend normally runs at `http://localhost:5173`.
 
 Set `VITE_API_URL` when the API is not running on localhost.
 
@@ -184,7 +179,7 @@ OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=llama3.2
 ```
 
-For automatic selection, use:
+For automatic selection:
 
 ```env
 AI_ENGINE=auto
@@ -245,11 +240,7 @@ PUT  /api/preferences
 
 ## 🧪 Testing
 
-Backend tests live in:
-
-```text
-server/tests/
-```
+Backend tests live in `server/tests/`.
 
 Run them with:
 
@@ -271,7 +262,7 @@ server/Dockerfile
 frontend/Dockerfile
 ```
 
-The current project is structured so the frontend and backend can be deployed independently.
+The frontend and backend can be deployed independently.
 
 ## 🗺️ Roadmap
 
