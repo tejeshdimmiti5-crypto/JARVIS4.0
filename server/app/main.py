@@ -285,7 +285,7 @@ async def study_pdf(req:ChatRequest,user:User|None=Depends(optional_user),db:Ses
  if req.document_id:
   if not user:raise HTTPException(401,'Authentication required for document study')
   owned_document(db,user,req.document_id)
- a,s=await run_chat(req);return ChatResponse(answer=a,model=GEMINI_MODEL if selected_engine()=='gemini' else OLLAMA_MODEL if selected_engine()=='ollama' else 'offline',used_ai=selected_engine()!='offline',sources=s)
+ a,s=await run_chat(req,user,db);return ChatResponse(answer=a,model=GEMINI_MODEL if selected_engine()=='gemini' else OLLAMA_MODEL if selected_engine()=='ollama' else 'offline',used_ai=selected_engine()!='offline',sources=s)
 @app.get('/api/documents')
 def list_documents(user:User=Depends(current_user),db:Session=Depends(db_session)):
  rows=db.scalars(select(DocumentRecord).where(DocumentRecord.user_id==user.id).order_by(DocumentRecord.created_at.desc())).all()
