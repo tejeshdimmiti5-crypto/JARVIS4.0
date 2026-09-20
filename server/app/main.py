@@ -108,7 +108,11 @@ async def run_tool_command(question:str,user:User|None=None,db:Session|None=None
   if name=="study_summary" and user and db:
    args={"subjects":[s.name for s in db.scalars(select(Subject).where(Subject.user_id==user.id)).all()]}
   if name=="notes_summary" and user and db:
-   args={"notes":[n.title for n in db.scalars(select(StudyNote).where(StudyNote.user_id==user.id)).all()]}\n  if name=="progress_summary" and user and db:\n   args={"tasks":[{"status":t.status} for t in db.scalars(select(StudyTask).where(StudyTask.user_id==user.id)).all()]}\n  if name=="planner_summary" and user and db:\n   args={"tasks":[{"title":t.title,"status":t.status} for t in db.scalars(select(StudyTask).where(StudyTask.user_id==user.id).order_by(StudyTask.due_date.asc().nullslast()).limit(20)).all()]}
+   args={"notes":[n.title for n in db.scalars(select(StudyNote).where(StudyNote.user_id==user.id)).all()]}
+  if name=="progress_summary" and user and db:
+   args={"tasks":[{"status":t.status} for t in db.scalars(select(StudyTask).where(StudyTask.user_id==user.id)).all()]}
+  if name=="planner_summary" and user and db:
+   args={"tasks":[{"title":t.title,"status":t.status} for t in db.scalars(select(StudyTask).where(StudyTask.user_id==user.id).order_by(StudyTask.due_date.asc()).limit(20)).all()]}
   result=run_tool(name,args)
   return f"Tool {name} result: {result}"
  except (KeyError,ValueError):
