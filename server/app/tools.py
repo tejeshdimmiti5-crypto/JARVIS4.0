@@ -150,4 +150,15 @@ def study_dashboard_tool(args: dict[str, Any]) -> dict[str, Any]:
         "completion_percent": round((completed / len(tasks)) * 100, 1) if tasks else 0,
         "pending_tasks": [str(t.get("title", ""))[:120] for t in pending[:10]],
     }
+def study_dashboard_tool(args: dict[str, Any]) -> dict[str, Any]:
+    subjects = args.get("subjects", [])
+    notes = args.get("notes", [])
+    tasks = args.get("tasks", [])
+    if not all(isinstance(v, list) for v in (subjects, notes, tasks)):
+        raise ValueError("dashboard data must be lists")
+    completed = sum(1 for t in tasks if isinstance(t, dict) and (t.get("completed") in {1, True, "1", "true"} or str(t.get("status", "")).lower() in {"done", "completed"}))
+    pending = [t for t in tasks if isinstance(t, dict) and not (t.get("completed") in {1, True, "1", "true"} or str(t.get("status", "")).lower() in {"done", "completed"})]
+    return {"subjects": [str(s)[:100] for s in subjects[:20]], "note_count": len(notes), "task_count": len(tasks), "completed_tasks": completed, "completion_percent": round((completed / len(tasks)) * 100, 1) if tasks else 0, "pending_tasks": [str(t.get("title", ""))[:120] for t in pending[:10]]}
+
+
 
