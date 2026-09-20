@@ -99,19 +99,23 @@ def login(data:AuthRequest,db:Session=Depends(db_session)):
  return {'access_token':create_token(u.id),'token_type':'bearer','user':{'id':u.id,'email':u.email}}
 @app.get('/api/auth/me')
 def me(user:User=Depends(current_user)):return {'id':user.id,'email':user.email}
-async def run_tool_command(question:str)->str|None:
+async def run_tool_command(question:str,user:User|None=None,db:Session|None=None)->str|None:
  from .tools import tool_for_text
  parsed=tool_for_text(question)
  if not parsed:return None
  name,args=parsed
  try:
-  result=run_tool(name,args)
-  return f"Tool {name} result: {result['result']}"
+  if name=="study_summary" and user and db:
+  args={"subjects":[s.name for s in db.scalars(select(Subject).where(Subject.user_id==user.id)).all()]}
+ if name=="notes_summary" and user and db:
+  args={"notes":[n.title for n in db.scalars(select(StudyNote).where(StudyNote.user_id==user.id).all())]}
+ result=run_tool(name,args)
+ return f"Tool {name} result: {result}"
  except (KeyError,ValueError):return None
 
 async def run_chat(req:ChatRequest,user:User|None=None,db:Session|None=None)->tuple[str,list[dict[str,Any]]]:
  sources=[];retrieved=req.context
- tool_result=await run_tool_command(req.question)
+ tool_result=await run_tool_command(req.question,user,db)
  if tool_result:return tool_result,sources
  if user and db:
   remembered=memory_context(db,user)
