@@ -21,7 +21,7 @@ services:
           name: jarvis-db
           property: connectionString
       - key: ALLOWED_ORIGINS
-        value: https://jarvis-ui.onrender.com
+        value: https://jarvis-ui-6eu8.onrender.com
 
   - type: web
     name: jarvis-ui
@@ -30,7 +30,7 @@ services:
     staticPublishPath: ./frontend/dist
     envVars:
       - key: VITE_API_URL
-        value: https://jarvis-api.onrender.com
+        value: https://jarvis-api-sum5.onrender.com
 
 databases:
   - name: jarvis-db
