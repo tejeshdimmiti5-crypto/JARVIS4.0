@@ -22,3 +22,8 @@ def test_calculator_rejects_code():
 def test_tool_registry():
     names = {item["name"] for item in list_tools()}
     assert "calculator" in names
+
+
+def test_natural_language_calculation_parser():
+    from app.tools import tool_for_text
+    assert tool_for_text("calculate 25 * 4") == ("calculator", {"expression": "25*4"})
