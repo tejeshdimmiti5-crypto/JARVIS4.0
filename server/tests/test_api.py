@@ -42,6 +42,11 @@ def test_protected_routes_require_auth():
     assert client.get('/api/flashcards').status_code in (401,403)
 
 
+def test_pdf_upload_requires_auth():
+    r=client.post('/api/pdf/extract',files={'file':('notes.pdf',b'%PDF-1.4','application/pdf')})
+    assert r.status_code in (401,403)
+
+
 def test_invalid_bearer_token_is_rejected():
     h={'Authorization':'Bearer definitely-invalid-token'}
     assert client.get('/api/notes',headers=h).status_code==401
