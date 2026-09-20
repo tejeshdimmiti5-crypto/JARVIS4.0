@@ -5,6 +5,12 @@ from sqlalchemy import DateTime,ForeignKey,String,Text,create_engine
 from sqlalchemy.orm import DeclarativeBase,Mapped,mapped_column,sessionmaker
 
 DATABASE_URL=os.getenv('DATABASE_URL','sqlite:///./data/jarvis.db')
+# Render commonly injects PostgreSQL URLs as postgresql://. This project uses
+# psycopg (v3), so normalize the scheme for SQLAlchemy before creating the engine.
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL='postgresql+psycopg://'+DATABASE_URL[len('postgres://'):]
+elif DATABASE_URL.startswith('postgresql://'):
+    DATABASE_URL='postgresql+psycopg://'+DATABASE_URL[len('postgresql://'):]
 if DATABASE_URL.startswith('sqlite:///'):
     os.makedirs('./data',exist_ok=True)
 connect_args={'check_same_thread':False} if DATABASE_URL.startswith('sqlite') else {}
