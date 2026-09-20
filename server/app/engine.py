@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import asyncio
 
 import httpx
 from fastapi import HTTPException
@@ -40,15 +41,33 @@ async def generate_text(prompt: str) -> tuple[str, str]:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent"
 
         try:
-            async with httpx.AsyncClient(timeout=90) as client:
-                response = await client.post(
-                    url,
-                    headers={"x-goog-api-key": gemini_key},
-                    json={"contents": [{"parts": [{"text": prompt}]}]},
-                )
+            async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=15.0)) as client:
+                response = None
+                for attempt in range(3):
+                    try:
+                        response = await client.post(
+                            url,
+                            headers={"x-goog-api-key": gemini_key},
+                            json={"contents": [{"parts": [{"text": prompt}]}]},
+                        )
+                    except (httpx.ConnectError, httpx.ReadTimeout, httpx.RemoteProtocolError) as exc:
+                        if attempt == 2:
+                            logger.error("Gemini transient connection failure after retries: %s", exc)
+                            raise HTTPException(503, "AI provider is temporarily unavailable. Please try again.") from exc
+                        await asyncio.sleep(1.5 * (attempt + 1))
+                        continue
+                    if response.status_code in {429, 500, 502, 503, 504} and attempt < 2:
+                        retry_after = response.headers.get("retry-after")
+                        delay = float(retry_after) if retry_after and retry_after.isdigit() else 1.5 * (attempt + 1)
+                        await asyncio.sleep(min(delay, 5))
+                        continue
+                    break
         except httpx.HTTPError as exc:
             logger.error("Gemini connection error: %s", exc)
             raise HTTPException(502, "Gemini connection failed") from exc
+
+        if response is None:
+            raise HTTPException(503, "AI provider is temporarily unavailable. Please try again.")
 
         if response.status_code >= 400:
             safe_body = response.text[:1000].replace(gemini_key, "[REDACTED]")
