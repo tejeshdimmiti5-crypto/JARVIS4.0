@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 import math
 import operator
-from datetime import datetime, timezone
+from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -20,19 +20,9 @@ def _calculate_expression(expression: str) -> float | int:
     expression = expression.strip()
     if not expression or len(expression) > 500:
         raise ValueError("Expression is empty or too long")
-
-    allowed_binops = {
-        ast.Add: operator.add,
-        ast.Sub: operator.sub,
-        ast.Mult: operator.mul,
-        ast.Div: operator.truediv,
-        ast.FloorDiv: operator.floordiv,
-        ast.Mod: operator.mod,
-        ast.Pow: operator.pow,
-    }
+    allowed_binops = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv, ast.FloorDiv: operator.floordiv, ast.Mod: operator.mod, ast.Pow: operator.pow}
     allowed_unary = {ast.UAdd: operator.pos, ast.USub: operator.neg}
     allowed_names = {"pi": math.pi, "e": math.e}
-
     def evaluate(node: ast.AST) -> float | int:
         if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
             return node.value
@@ -46,12 +36,10 @@ def _calculate_expression(expression: str) -> float | int:
         if isinstance(node, ast.UnaryOp) and type(node.op) in allowed_unary:
             return allowed_unary[type(node.op)](evaluate(node.operand))
         raise ValueError("Only arithmetic expressions are allowed")
-
     try:
         result = evaluate(ast.parse(expression, mode="eval").body)
     except (SyntaxError, ValueError, TypeError, ZeroDivisionError, OverflowError) as exc:
         raise ValueError("Invalid arithmetic expression") from exc
-
     if not math.isfinite(float(result)) or abs(float(result)) > 1e100:
         raise ValueError("Result is outside the supported range")
     return result
@@ -70,23 +58,6 @@ def time_tool(args: dict[str, Any]) -> dict[str, Any]:
 def calculator_tool(args: dict[str, Any]) -> dict[str, Any]:
     expression = str(args.get("expression", ""))
     return {"expression": expression, "result": _calculate_expression(expression)}
-
-
-TOOLS: dict[str, ToolDefinition] = {\n    "study_summary": ToolDefinition(name="study_summary", description="Summarize the supplied study subject list.", handler=study_summary_tool),
-    "progress_summary": ToolDefinition(name="progress_summary", description="Summarize study task completion progress.", handler=progress_summary_tool),
-    "planner_summary": ToolDefinition(name="planner_summary", description="Show pending study tasks for planning.", handler=planner_summary_tool),
-    "notes_summary": ToolDefinition(name="notes_summary", description="Summarize a supplied list of saved notes.", handler=notes_summary_tool),
-    "time": ToolDefinition(
-        name="time",
-        description="Return the current UTC date and time.",
-        handler=time_tool,
-    ),
-    "calculator": ToolDefinition(
-        name="calculator",
-        description="Safely evaluate basic arithmetic expressions without executing arbitrary code.",
-        handler=calculator_tool,
-    ),
-}
 
 
 def study_summary_tool(args: dict[str, Any]) -> dict[str, Any]:
@@ -112,6 +83,24 @@ def progress_summary_tool(args: dict[str, Any]) -> dict[str, Any]:
     return {"total_tasks": total, "completed_tasks": completed, "completion_percent": round((completed / total) * 100, 1) if total else 0}
 
 
+def planner_summary_tool(args: dict[str, Any]) -> dict[str, Any]:
+    tasks = args.get("tasks", [])
+    if not isinstance(tasks, list):
+        raise ValueError("tasks must be a list")
+    pending = [t for t in tasks if isinstance(t, dict) and str(t.get("status", "")).lower() not in {"done", "completed"}]
+    return {"pending_tasks": len(pending), "tasks": [str(t.get("title", ""))[:120] for t in pending[:10]]}
+
+
+TOOLS: dict[str, ToolDefinition] = {
+    "study_summary": ToolDefinition("study_summary", "Summarize the supplied study subject list.", study_summary_tool),
+    "progress_summary": ToolDefinition("progress_summary", "Summarize study task completion progress.", progress_summary_tool),
+    "planner_summary": ToolDefinition("planner_summary", "Show pending study tasks for planning.", planner_summary_tool),
+    "notes_summary": ToolDefinition("notes_summary", "Summarize a supplied list of saved notes.", notes_summary_tool),
+    "time": ToolDefinition("time", "Return the current date and time for a timezone.", time_tool),
+    "calculator": ToolDefinition("calculator", "Safely evaluate basic arithmetic expressions.", calculator_tool),
+}
+
+
 def list_tools() -> list[dict[str, str]]:
     return [{"name": tool.name, "description": tool.description} for tool in TOOLS.values()]
 
@@ -127,7 +116,9 @@ def tool_for_text(text: str) -> tuple[str, dict[str, Any]] | None:
         return "notes_summary", {"notes": []}
     if q in {"show my progress", "my progress", "study progress", "how am i doing"}:
         return "progress_summary", {"tasks": []}
-    match = re.search(r"(?:calculate|what is)\s+([0-9pi e+\-*/().%]+)$", q)
+    if q in {"show my planner", "my planner", "study planner", "what should i study"}:
+        return "planner_summary", {"tasks": []}
+    match = re.search(r"(?:calculate|what is)\\s+([0-9pi e+\\-*/().%]+)$", q)
     if not match:
         return None
     return "calculator", {"expression": match.group(1).replace(" ", "")}
@@ -137,14 +128,4 @@ def run_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
     tool = TOOLS.get(name)
     if tool is None:
         raise KeyError(f"Unknown tool: {name}")
-    return tool.handler(args)\ndef planner_summary_tool(args: dict[str, Any]) -> dict[str, Any]:
-    tasks = args.get("tasks", [])
-    if not isinstance(tasks, list):
-        raise ValueError("tasks must be a list")
-    pending = [t for t in tasks if isinstance(t, dict) and str(t.get("status", "")).lower() not in {"done", "completed"}]
-    return {
-        "pending_tasks": len(pending),
-        "tasks": [str(t.get("title", ""))[:120] for t in pending[:10]],
-    }
-
-
+    return tool.handler(args)
