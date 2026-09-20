@@ -11,11 +11,11 @@ COPY alembic ./alembic
 COPY alembic.ini .
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh \
-    && useradd --create-home --uid 10001 --shell /usr/sbin/nologin studentai \
+    && useradd --create-home --uid 10001 --shell /usr/sbin/nologin jarvis \
     && mkdir -p /app/data \
-    && chown -R studentai:studentai /app
+    && chown -R jarvis:jarvis /app
 
-USER studentai
+USER jarvis
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)" || exit 1
 ENTRYPOINT ["/app/entrypoint.sh"]
