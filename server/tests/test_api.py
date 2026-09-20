@@ -8,7 +8,7 @@ client=TestClient(app)
 
 def auth_user():
     email=f"test-{uuid4().hex[:10]}@example.com"
-    password="StudentAI123!"
+    password="JARVIS123!"
     r=client.post('/api/auth/register',json={'email':email,'password':password})
     assert r.status_code==200
     return {'Authorization':f"Bearer {r.json()['access_token']}"}
