@@ -65,3 +65,11 @@ def test_study_command_parser():
     from app.tools import tool_for_text
     assert tool_for_text("show my planner") == ("planner_summary", {"tasks": []})
     assert tool_for_text("show my progress") == ("progress_summary", {"tasks": []})
+
+
+def test_study_dashboard_tool():
+    result = run_tool("study_dashboard", {"subjects": ["ML"], "notes": ["Unit 1"], "tasks": [{"title": "DSA", "completed": 0}, {"title": "Python", "completed": 1}]})
+    assert result["task_count"] == 2
+    assert result["completed_tasks"] == 1
+    assert result["completion_percent"] == 50.0
+    assert result["pending_tasks"] == ["DSA"]
