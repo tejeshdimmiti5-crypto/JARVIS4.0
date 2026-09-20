@@ -128,7 +128,9 @@ def focus_recommendation_tool(args: dict[str, Any]) -> dict[str, Any]:
     pending = [t for t in tasks if isinstance(t, dict) and not (t.get("completed") in {1, True, "1", "true"} or str(t.get("status", "")).lower() in {"done", "completed"})]
     pending.sort(key=lambda t: (str(t.get("task_date", "")), -int(t.get("minutes", 0) or 0)))
     focus = pending[0] if pending else None
-    due_today = [t for t in pending if str(t.get("task_date", "")) == "2026-09-20"]
+    from datetime import date
+    today = date.today().isoformat()
+    due_today = [t for t in pending if str(t.get("task_date", "")) == today]
     return {
         "focus": str(focus.get("title", ""))[:120] if focus else "No pending study task",
         "reason": "Start with today's pending task." if due_today else ("Start with your earliest pending task." if focus else "Your current study task list is complete."),
