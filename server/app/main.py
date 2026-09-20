@@ -192,7 +192,7 @@ def delete_note(note_id:int,user:User=Depends(current_user),db:Session=Depends(d
  if not n:raise HTTPException(404,'Note not found')
  db.delete(n);db.commit();return {'deleted':True}
 @app.post('/api/pdf/extract')
-async def extract_pdf(file:UploadFile=File(...),user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
+async def extract_pdf(file:UploadFile=File(...),user:User=Depends(current_user),db:Session=Depends(db_session)):
  if file.content_type!='application/pdf' and not (file.filename or '').lower().endswith('.pdf'):raise HTTPException(400,'Please upload a PDF file')
  raw=await file.read()
  if len(raw)>20*1024*1024:raise HTTPException(413,'PDF must be smaller than 20 MB')
@@ -203,8 +203,7 @@ async def extract_pdf(file:UploadFile=File(...),user:User|None=Depends(optional_
   if GEMINI_API_KEY:
    try:indexed=await index_chunks(did,[{'page':c.page,'text':c.text} for c in chunks])
    except Exception:pass
-  if user:
-   db.add(DocumentRecord(user_id=user.id,document_id=did,filename=file.filename or 'document.pdf',pages=len(pages)));db.commit();event(db,user.id,'pdf_upload')
+  db.add(DocumentRecord(user_id=user.id,document_id=did,filename=file.filename or 'document.pdf',pages=len(pages)));db.commit();event(db,user.id,'pdf_upload')
   return {'document_id':did,'filename':file.filename,'pages':len(pages),'characters':len(text),'chunks':len(chunks),'indexed_chunks':indexed,'text':text[:150000]}
  except HTTPException:raise
  except Exception as e:raise HTTPException(422,f'Could not read PDF: {e}') from e
