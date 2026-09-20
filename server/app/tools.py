@@ -73,6 +73,7 @@ def calculator_tool(args: dict[str, Any]) -> dict[str, Any]:
 
 
 TOOLS: dict[str, ToolDefinition] = {\n    "study_summary": ToolDefinition(name="study_summary", description="Summarize the supplied study subject list.", handler=study_summary_tool),
+    "notes_summary": ToolDefinition(name="notes_summary", description="Summarize a supplied list of saved notes.", handler=notes_summary_tool),
     "time": ToolDefinition(
         name="time",
         description="Return the current UTC date and time.",
@@ -91,6 +92,13 @@ def study_summary_tool(args: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(subjects, list):
         raise ValueError("subjects must be a list")
     return {"subject_count": len(subjects), "subjects": [str(s)[:100] for s in subjects[:20]]}
+
+
+def notes_summary_tool(args: dict[str, Any]) -> dict[str, Any]:
+    notes = args.get("notes", [])
+    if not isinstance(notes, list):
+        raise ValueError("notes must be a list")
+    return {"note_count": len(notes), "notes": [str(n)[:200] for n in notes[:10]]}
 
 
 def list_tools() -> list[dict[str, str]]:
