@@ -73,3 +73,10 @@ def test_study_dashboard_tool():
     assert result["completed_tasks"] == 1
     assert result["completion_percent"] == 50.0
     assert result["pending_tasks"] == ["DSA"]
+
+
+def test_daily_briefing_tool():
+    result = run_tool("daily_briefing", {"subjects": ["ML", "DSA"], "notes": ["Unit 1"], "tasks": [{"title": "Revise ML", "completed": 0, "minutes": 45}, {"title": "DSA", "completed": 1, "minutes": 30}]})
+    assert result["subject_count"] == 2
+    assert result["pending_task_count"] == 1
+    assert result["planned_minutes"] == 45
