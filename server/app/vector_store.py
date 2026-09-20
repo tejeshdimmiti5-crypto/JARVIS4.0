@@ -1,5 +1,5 @@
 from __future__ import annotations
-import hashlib,os
+import hashlib,os,asyncio
 from typing import Any
 import chromadb,httpx
 GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');EMBEDDING_MODEL=os.getenv('GEMINI_EMBEDDING_MODEL','gemini-embedding-001');DB_PATH=os.getenv('CHROMA_PATH','./data/chroma')
@@ -8,9 +8,18 @@ _client=chromadb.PersistentClient(path=DB_PATH);_collection=_client.get_or_creat
 async def embed(text:str)->list[float]:
  if not GEMINI_API_KEY:raise RuntimeError('GEMINI_API_KEY is required for semantic indexing')
  url=f'https://generativelanguage.googleapis.com/v1beta/models/{EMBEDDING_MODEL}:embedContent';payload={'model':f'models/{EMBEDDING_MODEL}','content':{'parts':[{'text':text}]}}
- async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=15.0)) as client:r=await client.post(url,headers={'x-goog-api-key':GEMINI_API_KEY},json=payload)
- if r.status_code>=400:raise RuntimeError(r.text[:500])
- return r.json()['embedding']['values']
+ async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=15.0)) as client:
+  for attempt in range(3):
+   try:r=await client.post(url,headers={'x-goog-api-key':GEMINI_API_KEY},json=payload)
+   except (httpx.ConnectError,httpx.ReadTimeout,httpx.RemoteProtocolError) as exc:
+    if attempt==2:raise RuntimeError('Embedding provider connection failed') from exc
+    await asyncio.sleep(1.5*(attempt+1));continue
+   if r.status_code in {429,500,502,503,504} and attempt<2:
+    await asyncio.sleep(min(1.5*(attempt+1),5));continue
+   break
+ if r.status_code>=400:raise RuntimeError('Embedding provider request failed')
+ try:return r.json()['embedding']['values']
+ except (ValueError,KeyError,TypeError) as exc:raise RuntimeError('Embedding provider returned an invalid response') from exc
 async def index_chunks(document_id:str,chunks:list[dict[str,Any]])->int:
  if not chunks:return 0
  ids=[];texts=[];metas=[];vectors=[]
