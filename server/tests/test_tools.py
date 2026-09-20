@@ -27,3 +27,13 @@ def test_tool_registry():
 def test_natural_language_calculation_parser():
     from app.tools import tool_for_text
     assert tool_for_text("calculate 25 * 4") == ("calculator", {"expression": "25*4"})
+
+
+def test_time_tool():
+    result = run_tool("time", {})
+    assert result["date"]
+    assert result["time"]
+
+def test_natural_language_time_tool():
+    from app.tools import tool_for_text
+    assert tool_for_text("what time is it") == ("time", {})
