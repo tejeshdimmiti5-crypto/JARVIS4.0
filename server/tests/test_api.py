@@ -135,3 +135,13 @@ def test_chat_executes_study_dashboard_tool():
     assert r.status_code==200
     assert 'study_dashboard' in r.json()['answer']
     assert 'Machine Learning' in r.json()['answer']
+
+
+def test_chat_executes_daily_briefing_tool():
+    h=auth_user()
+    client.post('/api/subjects',headers=h,json={'name':'Machine Learning','code':'ML','daily_minutes':45})
+    client.post('/api/study/tasks',headers=h,json={'title':'Revise Unit 1','task_date':'2026-09-20','minutes':45})
+    r=client.post('/api/chat',headers=h,json={'question':'daily briefing'})
+    assert r.status_code==200
+    assert 'daily_briefing' in r.json()['answer']
+    assert 'Machine Learning' in r.json()['answer']
