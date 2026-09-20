@@ -56,6 +56,8 @@ def memory_context(db:Session,user:User)->str:
 
 async def gemini(prompt:str)->str:
  answer,_=await generate_text(prompt)
+ if not answer:
+  raise HTTPException(503,'JARVIS AI is temporarily unavailable. Please try again in a moment.')
  return answer
 def parse_flashcards(text:str)->list[Flashcard]:
  cards=[];q=None
@@ -150,7 +152,14 @@ async def run_chat(req:ChatRequest,user:User|None=None,db:Session|None=None)->tu
   if hits:
    sources=[{'page':h.page,'preview':h.text[:240]} for h in hits] if hasattr(hits[0],'text') else [{'page':h['page'],'preview':h['text'][:240],'distance':h.get('distance')} for h in hits]
    retrieved='\n\n'.join(f'[Page {h.page}]\n{h.text}' for h in hits) if hasattr(hits[0],'text') else '\n\n'.join(f"[Page {h['page']}]\n{h['text']}" for h in hits)
- a=await gemini(build_prompt(req,retrieved));return (a or offline_answer(req.question)),sources
+ try:
+  a=await gemini(build_prompt(req,retrieved))
+ except HTTPException as exc:
+  if exc.status_code in {502,503,504}:
+   a=offline_answer(req.question)
+  else:
+   raise
+ return a,sources
 @app.post('/api/chat',response_model=ChatResponse)
 async def chat(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
  if req.document_id:
