@@ -127,6 +127,8 @@ Swagger API docs: `http://localhost:8000/docs`
 - `GET /api/documents/{document_id}/search`
 - `POST /api/flashcards/generate`
 - `GET /api/analytics/summary`
+- `GET /api/preferences`
+- `PUT /api/preferences`
 - `GET /api/study/tasks`
 
 ## Security
