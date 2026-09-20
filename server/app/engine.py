@@ -18,7 +18,7 @@ def selected_engine() -> str:
         return AI_ENGINE
     if GEMINI_API_KEY:
         return "gemini"
-    return "ollama" if OLLAMA_BASE_URL else "offline"
+    return "gemini" if GEMINI_API_KEY else "offline"
 
 
 async def generate_text(prompt: str) -> tuple[str, str]:
