@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: studentai-api
+    name: jarvis-api
     runtime: docker
     dockerfilePath: ./server/Dockerfile
     healthCheckPath: /api/health
