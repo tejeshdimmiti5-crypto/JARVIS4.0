@@ -46,7 +46,9 @@ def test_time_tool_timezone():
 def test_study_summary_tool():
     result = run_tool("study_summary", {"subjects": ["AI", "DSA"]})
     assert result["subject_count"] == 2
-\n\ndef test_progress_summary_tool():
+
+
+def test_progress_summary_tool():
     result = run_tool("progress_summary", {"tasks": [{"completed": 1}, {"completed": 0}]})
     assert result["total_tasks"] == 2
     assert result["completed_tasks"] == 1
