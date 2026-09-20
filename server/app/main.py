@@ -119,6 +119,10 @@ async def run_tool_command(question:str,user:User|None=None,db:Session|None=None
    args={"subjects":[s.name for s in db.scalars(select(Subject).where(Subject.user_id==user.id)).all()],"notes":[n.title for n in db.scalars(select(StudyNote).where(StudyNote.user_id==user.id).order_by(StudyNote.updated_at.desc()).limit(5)).all()],"tasks":[{"title":t.title,"completed":t.completed,"minutes":t.minutes} for t in db.scalars(select(StudyTask).where(StudyTask.user_id==user.id).order_by(StudyTask.task_date.asc()).limit(20)).all()]}
   if name=="focus_recommendation" and user and db:
    args={"subjects":[s.name for s in db.scalars(select(Subject).where(Subject.user_id==user.id)).all()],"tasks":[{"title":t.title,"completed":t.completed,"minutes":t.minutes,"task_date":str(t.task_date)} for t in db.scalars(select(StudyTask).where(StudyTask.user_id==user.id).order_by(StudyTask.task_date.asc()).limit(20)).all()]}
+   pref=db.scalar(select(UserPreference).where(UserPreference.user_id==user.id))
+   if pref and pref.focus_subject:
+    args["focus_subject"]=pref.focus_subject
+
   if name=="weekly_review" and user and db:
    args={"tasks":[{"completed":t.completed} for t in db.scalars(select(StudyTask).where(StudyTask.user_id==user.id).all())],"events":[{"minutes":e.minutes} for e in db.scalars(select(StudyEvent).where(StudyEvent.user_id==user.id)).all()]}
   result=run_tool(name,args)
