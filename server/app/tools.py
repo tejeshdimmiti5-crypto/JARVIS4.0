@@ -4,6 +4,7 @@ import ast
 import math
 import operator
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -57,8 +58,13 @@ def _calculate_expression(expression: str) -> float | int:
 
 
 def time_tool(args: dict[str, Any]) -> dict[str, Any]:
-    now = datetime.now(timezone.utc)
-    return {"utc": now.isoformat(), "date": now.date().isoformat(), "time": now.strftime("%H:%M:%S")}
+    zone = str(args.get("timezone", "UTC")).strip() or "UTC"
+    try:
+        tz = ZoneInfo(zone)
+    except ZoneInfoNotFoundError as exc:
+        raise ValueError("Unknown timezone") from exc
+    now = datetime.now(tz)
+    return {"timezone": zone, "date": now.date().isoformat(), "time": now.strftime("%H:%M:%S"), "iso": now.isoformat()}
 
 
 def calculator_tool(args: dict[str, Any]) -> dict[str, Any]:
