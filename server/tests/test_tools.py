@@ -42,3 +42,7 @@ def test_time_tool_timezone():
     result = run_tool("time", {"timezone": "Asia/Kolkata"})
     assert result["timezone"] == "Asia/Kolkata"
     assert len(result["time"]) == 8
+
+def test_study_summary_tool():
+    result = run_tool("study_summary", {"subjects": ["AI", "DSA"]})
+    assert result["subject_count"] == 2
