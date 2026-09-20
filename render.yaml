@@ -2,6 +2,8 @@ services:
   - type: web
     name: jarvis-api
     runtime: docker
+    region: singapore
+    plan: free
     dockerfilePath: ./server/Dockerfile
     healthCheckPath: /api/health
     envVars:
@@ -12,8 +14,25 @@ services:
       - key: GEMINI_EMBEDDING_MODEL
         value: gemini-embedding-001
       - key: JWT_SECRET
-        sync: false
+        generateValue: true
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: jarvis-db
+          property: connectionString
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: https://jarvis-ui.onrender.com
+
+  - type: web
+    name: jarvis-ui
+    runtime: docker
+    region: singapore
+    plan: free
+    dockerfilePath: ./frontend/Dockerfile
+    healthCheckPath: /
+
+databases:
+  - name: jarvis-db
+    plan: free
+    region: singapore
+    databaseName: jarvis
+    user: jarvis
