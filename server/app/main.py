@@ -115,6 +115,8 @@ async def run_tool_command(question:str,user:User|None=None,db:Session|None=None
    args={"tasks":[{"title":t.title,"completed":t.completed} for t in db.scalars(select(StudyTask).where(StudyTask.user_id==user.id).order_by(StudyTask.task_date.asc()).limit(20)).all()]}
   if name=="study_dashboard" and user and db:
    args={"subjects":[s.name for s in db.scalars(select(Subject).where(Subject.user_id==user.id)).all()],"notes":[n.title for n in db.scalars(select(StudyNote).where(StudyNote.user_id==user.id)).all()],"tasks":[{"title":t.title,"completed":t.completed} for t in db.scalars(select(StudyTask).where(StudyTask.user_id==user.id).order_by(StudyTask.task_date.asc()).limit(20)).all()]}
+  if name=="daily_briefing" and user and db:
+   args={"subjects":[s.name for s in db.scalars(select(Subject).where(Subject.user_id==user.id)).all()],"notes":[n.title for n in db.scalars(select(StudyNote).where(StudyNote.user_id==user.id).order_by(StudyNote.updated_at.desc()).limit(5)).all()],"tasks":[{"title":t.title,"completed":t.completed,"minutes":t.minutes} for t in db.scalars(select(StudyTask).where(StudyTask.user_id==user.id).order_by(StudyTask.task_date.asc()).limit(20)).all()]}
   result=run_tool(name,args)
   return f"Tool {name} result: {result}"
  except (KeyError,ValueError):
