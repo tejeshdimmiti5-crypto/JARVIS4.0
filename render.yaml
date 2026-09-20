@@ -5,6 +5,7 @@ services:
     region: singapore
     plan: free
     dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
     healthCheckPath: /api/health
     envVars:
       - key: GEMINI_API_KEY
