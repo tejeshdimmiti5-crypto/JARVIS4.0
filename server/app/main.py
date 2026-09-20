@@ -46,6 +46,14 @@ def build_prompt(req:ChatRequest,retrieved:str='')->str:
  agent_instruction=agent.instruction
  task={'answer':'Answer the student clearly and exam-ready.','summary':'Create an exam-ready summary with key concepts, definitions, formulas or steps, and likely questions.','quiz':'Generate 5 MCQs with four options, the correct answer, and a one-line explanation.','notes':'Create concise revision notes with headings and bullet points.','flashcards':'Create 10 study flashcards. Format each as Q: question / A: answer.'}.get(req.task,'Answer the student clearly.')
  return f'You are JARVIS, a university study assistant. You are operating as the {agent_name} agent. {agent_instruction}\n{task}\nUse retrieved material when present. Cite supporting pages as [Page N]. Never invent citations.\n\nRETRIEVED:\n{retrieved[:30000]}\n\nQUESTION:\n{req.question}'
+def memory_context(db:Session,user:User)->str:
+ rows=db.scalars(select(ChatMessage).where(ChatMessage.user_id==user.id).order_by(ChatMessage.created_at.desc()).limit(8)).all()
+ notes=db.scalars(select(StudyNote).where(StudyNote.user_id==user.id).order_by(StudyNote.updated_at.desc()).limit(5)).all()
+ parts=[]
+ if rows:parts.append('RECENT CONVERSATION:\\n'+'\\n'.join(f'{r.role}: {r.content[:1200]}' for r in reversed(rows)))
+ if notes:parts.append('SAVED NOTES:\\n'+'\\n'.join(f'- {n.title}: {n.content[:1200]}' for n in notes))
+ return '\\n\\n'.join(parts)
+
 async def gemini(prompt:str)->str:
  answer,_=await generate_text(prompt)
  return answer
@@ -91,8 +99,11 @@ def login(data:AuthRequest,db:Session=Depends(db_session)):
  return {'access_token':create_token(u.id),'token_type':'bearer','user':{'id':u.id,'email':u.email}}
 @app.get('/api/auth/me')
 def me(user:User=Depends(current_user)):return {'id':user.id,'email':user.email}
-async def run_chat(req:ChatRequest)->tuple[str,list[dict[str,Any]]]:
+async def run_chat(req:ChatRequest,user:User|None=None,db:Session|None=None)->tuple[str,list[dict[str,Any]]]:
  sources=[];retrieved=req.context
+ if user and db:
+  remembered=memory_context(db,user)
+  if remembered:retrieved=(retrieved+'\\n\\n'+remembered).strip()
  if req.use_retrieval:
   hits=[]
   if req.document_id and req.semantic and GEMINI_API_KEY:
@@ -111,7 +122,7 @@ async def chat(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=
  if req.document_id:
   if not user:raise HTTPException(401,'Authentication required for document study')
   owned_document(db,user,req.document_id)
- a,sources=await run_chat(req)
+ a,sources=await run_chat(req,user,db)
  if user:db.add_all([ChatMessage(user_id=user.id,role='user',content=req.question),ChatMessage(user_id=user.id,role='assistant',content=a)]);db.commit();event(db,user.id,'question')
  return ChatResponse(answer=a,model=GEMINI_MODEL if selected_engine()=='gemini' else OLLAMA_MODEL if selected_engine()=='ollama' else 'offline',used_ai=selected_engine()!='offline',sources=sources)
 @app.post('/api/flashcards/generate',response_model=FlashcardResponse)
