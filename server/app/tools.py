@@ -140,6 +140,17 @@ def focus_recommendation_tool(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def weekly_review_tool(args: dict[str, Any]) -> dict[str, Any]:
+    tasks = args.get("tasks", [])
+    events = args.get("events", [])
+    if not isinstance(tasks, list) or not isinstance(events, list):
+        raise ValueError("review data must be lists")
+    total = len(tasks)
+    completed = sum(1 for t in tasks if isinstance(t, dict) and (t.get("completed") in {1, True, "1", "true"} or str(t.get("status", "")).lower() in {"done", "completed"}))
+    minutes = sum(int(e.get("minutes", 0) or 0) for e in events if isinstance(e, dict))
+    return {"tasks": total, "completed": completed, "completion_percent": round(completed / total * 100, 1) if total else 0, "study_minutes": minutes, "event_count": len(events)}
+
+
 TOOLS: dict[str, ToolDefinition] = {
     "study_summary": ToolDefinition("study_summary", "Summarize the supplied study subject list.", study_summary_tool),
     "progress_summary": ToolDefinition("progress_summary", "Summarize study task completion progress.", progress_summary_tool),
@@ -147,6 +158,7 @@ TOOLS: dict[str, ToolDefinition] = {
     "study_dashboard": ToolDefinition("study_dashboard", "Summarize subjects, notes, and study task progress.", study_dashboard_tool),
     "daily_briefing": ToolDefinition("daily_briefing", "Create a concise daily study briefing from user data.", daily_briefing_tool),
     "focus_recommendation": ToolDefinition("focus_recommendation", "Recommend the next pending study task from user data.", focus_recommendation_tool),
+    "weekly_review": ToolDefinition("weekly_review", "Summarize recent study activity and completion.", weekly_review_tool),
     "notes_summary": ToolDefinition("notes_summary", "Summarize a supplied list of saved notes.", notes_summary_tool),
     "time": ToolDefinition("time", "Return the current date and time for a timezone.", time_tool),
     "calculator": ToolDefinition("calculator", "Safely evaluate basic arithmetic expressions.", calculator_tool),
@@ -176,6 +188,8 @@ def tool_for_text(text: str) -> tuple[str, dict[str, Any]] | None:
         return "daily_briefing", {}
     if q in {"what should i study first", "what should i do next", "what should i focus on", "my next study task"}:
         return "focus_recommendation", {}
+    if q in {"weekly review", "my weekly review", "study review", "how did i do this week"}:
+        return "weekly_review", {}
     match = re.search(r"(?:calculate|what is)\s+([0-9pi e+\-*/().%]+)$", q)
     if not match:
         return None
