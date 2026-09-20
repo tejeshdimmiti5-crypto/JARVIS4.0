@@ -16,6 +16,7 @@ AGENTS = {
     "planner": AgentDecision("planner", "Help organize realistic study tasks, priorities, topics, and time blocks."),
     "coding": AgentDecision("coding", "Act as a coding tutor: explain the approach, provide correct code, and mention important edge cases."),
     "general": AgentDecision("general", "Answer helpfully and concisely while staying focused on the user's request."),
+    "tools": AgentDecision("tools", "Use available JARVIS tools only when they directly help answer the request. Never claim a tool was used unless the backend actually executed it."),
 }
 
 
@@ -23,6 +24,8 @@ def route_agent(question: str, task: str = "answer", document_id: str | None = N
     """Choose a lightweight JARVIS agent without requiring a second model call."""
     if document_id:
         return AGENTS["pdf"]
+    if any(x in q for x in ("calculate", "calculator", "what is", "how much is")) and any(ch.isdigit() for ch in q):
+        return AGENTS["tools"]
 
     q = question.lower()
     if task == "quiz" or any(x in q for x in ("quiz", "mcq", "multiple choice", "test me")):
