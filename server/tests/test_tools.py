@@ -46,3 +46,20 @@ def test_time_tool_timezone():
 def test_study_summary_tool():
     result = run_tool("study_summary", {"subjects": ["AI", "DSA"]})
     assert result["subject_count"] == 2
+\n\ndef test_progress_summary_tool():
+    result = run_tool("progress_summary", {"tasks": [{"status": "completed"}, {"status": "pending"}]})
+    assert result["total_tasks"] == 2
+    assert result["completed_tasks"] == 1
+    assert result["completion_percent"] == 50.0
+
+
+def test_planner_summary_tool():
+    result = run_tool("planner_summary", {"tasks": [{"title": "DSA", "status": "pending"}, {"title": "ML", "status": "done"}]})
+    assert result["pending_tasks"] == 1
+    assert result["tasks"] == ["DSA"]
+
+
+def test_study_command_parser():
+    from app.tools import tool_for_text
+    assert tool_for_text("show my planner") == ("planner_summary", {"tasks": []})
+    assert tool_for_text("show my progress") == ("progress_summary", {"tasks": []})
