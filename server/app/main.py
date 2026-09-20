@@ -76,7 +76,7 @@ async def health():
  try:
   with engine.connect() as c:c.exec_driver_sql('SELECT 1');database=True
  except Exception:pass
- return {'status':'ok','service':'JARVIS API','ai_configured':bool(GEMINI_API_KEY),'vector_store':'chroma','database':database}
+ return {'status':'ok','service':'JARVIS API','ai_configured':selected_engine()!='offline','vector_store':'chroma','database':database}
 @app.post('/api/auth/register')
 def register(data:AuthRequest,db:Session=Depends(db_session)):
  email=data.email.strip().lower()
@@ -113,7 +113,7 @@ async def chat(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=
   owned_document(db,user,req.document_id)
  a,sources=await run_chat(req)
  if user:db.add_all([ChatMessage(user_id=user.id,role='user',content=req.question),ChatMessage(user_id=user.id,role='assistant',content=a)]);db.commit();event(db,user.id,'question')
- return ChatResponse(answer=a,model=GEMINI_MODEL if selected_engine()=='gemini' else OLLAMA_MODEL if selected_engine()=='ollama' else 'offline',used_ai=bool(GEMINI_API_KEY),sources=sources)
+ return ChatResponse(answer=a,model=GEMINI_MODEL if selected_engine()=='gemini' else OLLAMA_MODEL if selected_engine()=='ollama' else 'offline',used_ai=selected_engine()!='offline',sources=sources)
 @app.post('/api/flashcards/generate',response_model=FlashcardResponse)
 async def generate_flashcards(req:FlashcardRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
  if req.document_id:
