@@ -40,6 +40,7 @@ AI Engine
 - Persistent chat history and personal notes
 - Subject management and study planning
 - Progress analytics and study events
+- Daily briefings, focus recommendations, and weekly study reviews
 - JWT authentication with Argon2 password hashing
 - User-scoped document isolation
 - Docker Compose development and production stacks
