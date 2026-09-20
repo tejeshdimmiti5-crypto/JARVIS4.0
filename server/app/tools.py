@@ -137,7 +137,6 @@ def tool_for_text(text: str) -> tuple[str, dict[str, Any]] | None:
         return None
     return "calculator", {"expression": match.group(1).replace(" ", "")}
 
-
 def run_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
     tool = TOOLS.get(name)
     if tool is None:
