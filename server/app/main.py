@@ -17,6 +17,7 @@ from .analytics import daily_summary
 from .rag import chunk_document,lexical_retrieve
 from .study import PlanInput,make_plan
 from .vector_store import index_chunks,semantic_search
+from .agents import route_agent
 GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL','gemini-2.0-flash');ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
 app=FastAPI(title='JARVIS API',version='2.0.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Authorization','Content-Type'])
 class ChatRequest(BaseModel):question:str=Field(min_length=1,max_length=12000);context:str=Field(default='',max_length=50000);document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
@@ -36,9 +37,9 @@ def offline_answer(q:str)->str:
  if 'big data' in q:return 'Big Data refers to datasets whose volume, velocity, variety, veracity or value create challenges for conventional systems.'
  if 'stack' in q:return 'A stack follows LIFO (Last In, First Out). Common operations are push, pop and peek.'
  return 'JARVIS is running in offline mode. Configure GEMINI_API_KEY on the backend to enable real AI responses.'
-def build_prompt(req:ChatRequest,retrieved:str='')->str:
- task={'answer':'Answer the student clearly and exam-ready.','summary':'Create an exam-ready summary with key concepts, definitions, formulas or steps, and likely questions.','quiz':'Generate 5 MCQs with four options, the correct answer, and a one-line explanation.','notes':'Create concise revision notes with headings and bullet points.','flashcards':'Create 10 study flashcards. Format each as Q: question / A: answer.'}.get(req.task,'Answer the student clearly.')
- return f'You are JARVIS, a university study assistant. {task}\nUse retrieved material when present. Cite supporting pages as [Page N]. Never invent citations.\n\nRETRIEVED:\n{retrieved[:30000]}\n\nQUESTION:\n{req.question}'
+def build_prompt(req:ChatRequest,retrieved:str='',agent_instruction:str='')->str:
+ agent=route_agent(req.question,req.task,req.document_id)\n agent_name=agent.name\n agent_instruction=agent.instruction\n task={'answer':'Answer the student clearly and exam-ready.','summary':'Create an exam-ready summary with key concepts, definitions, formulas or steps, and likely questions.','quiz':'Generate 5 MCQs with four options, the correct answer, and a one-line explanation.','notes':'Create concise revision notes with headings and bullet points.','flashcards':'Create 10 study flashcards. Format each as Q: question / A: answer.'}.get(req.task,'Answer the student clearly.')
+ return f'You are JARVIS, a university study assistant. You are operating as the {agent_name} agent. {agent_instruction}\n{task}\nUse retrieved material when present. Cite supporting pages as [Page N]. Never invent citations.\n\nRETRIEVED:\n{retrieved[:30000]}\n\nQUESTION:\n{req.question}'
 async def gemini(prompt:str)->str:
  if not GEMINI_API_KEY:return ''
  url=f'https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent'
@@ -93,7 +94,7 @@ async def run_chat(req:ChatRequest)->tuple[str,list[dict[str,Any]]]:
   if hits:
    sources=[{'page':h.page,'preview':h.text[:240]} for h in hits] if hasattr(hits[0],'text') else [{'page':h['page'],'preview':h['text'][:240],'distance':h.get('distance')} for h in hits]
    retrieved='\n\n'.join(f'[Page {h.page}]\n{h.text}' for h in hits) if hasattr(hits[0],'text') else '\n\n'.join(f"[Page {h['page']}]\n{h['text']}" for h in hits)
- a=await gemini(build_prompt(req,retrieved));return (a or offline_answer(req.question)),sources
+ a=await gemini(build_prompt(req,retrieved,agent.instruction));return (a or offline_answer(req.question)),sources
 @app.post('/api/chat',response_model=ChatResponse)
 async def chat(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
  if req.document_id:
