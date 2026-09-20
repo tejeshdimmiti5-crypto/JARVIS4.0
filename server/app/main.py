@@ -18,6 +18,7 @@ from .rag import chunk_document,lexical_retrieve
 from .study import PlanInput,make_plan
 from .vector_store import index_chunks,semantic_search
 from .agents import route_agent
+from .tools import list_tools,run_tool
 GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL','gemini-2.0-flash');ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
 app=FastAPI(title='JARVIS API',version='2.0.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Authorization','Content-Type'])
 class ChatRequest(BaseModel):question:str=Field(min_length=1,max_length=12000);context:str=Field(default='',max_length=50000);document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
@@ -29,6 +30,7 @@ class FlashcardRequest(BaseModel):topic:str=Field(min_length=1,max_length=4000);
 class FlashcardResponse(BaseModel):cards:list[Flashcard];model:str;used_ai:bool
 class SubjectRequest(BaseModel):name:str=Field(min_length=1,max_length=100);code:str=Field(default='',max_length=30);daily_minutes:int=Field(default=60,ge=15,le=480);exam_date:str|None=None
 class TaskComplete(BaseModel):completed:bool
+class ToolRequest(BaseModel):name:str=Field(min_length=1,max_length=100);arguments:dict[str,Any]=Field(default_factory=dict)
 
 def event(db,user_id,event_type,minutes=0):db.add(StudyEvent(user_id=user_id,event_type=event_type,minutes=minutes));db.commit()
 def offline_answer(q:str)->str:
@@ -62,6 +64,16 @@ def owned_document(db:Session,user:User,document_id:str)->DocumentRecord:
  record=db.scalar(select(DocumentRecord).where(DocumentRecord.document_id==document_id,DocumentRecord.user_id==user.id))
  if not record:raise HTTPException(404,'Document not found')
  return record
+@app.get('/api/tools')
+def tools_catalog(user:User|None=Depends(optional_user)):
+ return list_tools()
+@app.post('/api/tools/execute')
+def execute_tool(req:ToolRequest,user:User=Depends(current_user)):
+ try:
+  return {'tool':req.name,'result':run_tool(req.name,req.arguments)}
+ except KeyError as exc:raise HTTPException(404,str(exc)) from exc
+ except ValueError as exc:raise HTTPException(400,str(exc)) from exc
+
 @app.get('/api/health')
 async def health():
  database=False
