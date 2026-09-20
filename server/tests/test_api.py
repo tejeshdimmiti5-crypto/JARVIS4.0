@@ -145,3 +145,15 @@ def test_chat_executes_daily_briefing_tool():
     assert r.status_code==200
     assert 'daily_briefing' in r.json()['answer']
     assert 'Machine Learning' in r.json()['answer']
+
+
+def test_preferences_persist():
+    h=auth_user()
+    r=client.get('/api/preferences',headers=h)
+    assert r.status_code==200
+    assert r.json()['daily_minutes']==120
+    r=client.put('/api/preferences',headers=h,json={'daily_minutes':180,'focus_subject':'Machine Learning'})
+    assert r.status_code==200
+    assert r.json()['focus_subject']=='Machine Learning'
+    r=client.get('/api/preferences',headers=h)
+    assert r.json()['daily_minutes']==180
