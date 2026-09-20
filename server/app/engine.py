@@ -14,11 +14,13 @@ AI_ENGINE = os.getenv("AI_ENGINE", "auto").lower()
 
 
 def selected_engine() -> str:
-    if AI_ENGINE in {"gemini", "ollama", "offline"}:
-        return AI_ENGINE
-    if GEMINI_API_KEY:
+    engine = os.getenv("AI_ENGINE", AI_ENGINE).lower()
+    gemini_key = os.getenv("GEMINI_API_KEY", GEMINI_API_KEY)
+    if engine in {"gemini", "ollama", "offline"}:
+        return engine
+    if gemini_key:
         return "gemini"
-    return "gemini" if GEMINI_API_KEY else "offline"
+    return "offline"
 
 
 async def generate_text(prompt: str) -> tuple[str, str]:
