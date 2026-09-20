@@ -126,3 +126,10 @@ def test_chat_executes_safe_calculator_tool():
     r=client.post("/api/chat", json={"question": "calculate 25 * 4"})
     assert r.status_code == 200
     assert "100" in r.json()["answer"]
+\n\ndef test_chat_executes_study_dashboard_tool():
+    h=auth_user()
+    client.post('/api/subjects',headers=h,json={'name':'Machine Learning','code':'ML','daily_minutes':45})
+    r=client.post('/api/chat',headers=h,json={'question':'show my dashboard'})
+    assert r.status_code==200
+    assert 'study_dashboard' in r.json()['answer']
+    assert 'Machine Learning' in r.json()['answer']
