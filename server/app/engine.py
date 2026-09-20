@@ -27,7 +27,8 @@ async def generate_text(prompt: str) -> tuple[str, str]:
     engine = selected_engine()
     gemini_key = os.getenv("GEMINI_API_KEY", GEMINI_API_KEY)
     gemini_model = os.getenv("GEMINI_MODEL", GEMINI_MODEL)
-    ollama_base_url = os.getenv("OLLAMA_BASE_URL", OLLAMA_BASE_URL)\n    ollama_model = os.getenv("OLLAMA_MODEL", OLLAMA_MODEL)
+    ollama_base_url = os.getenv("OLLAMA_BASE_URL", OLLAMA_BASE_URL)
+    ollama_model = os.getenv("OLLAMA_MODEL", OLLAMA_MODEL)
     if engine == "gemini":
         if not gemini_key:
             return "", "offline"
