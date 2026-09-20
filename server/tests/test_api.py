@@ -2,6 +2,8 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from app.main import app
+from app.db import SessionLocal, User
+from app.models import DocumentRecord
 
 client=TestClient(app)
 
@@ -99,3 +101,20 @@ def test_daily_analytics_and_tasks():
     data=analytics.json()
     assert len(data['days'])==7
     assert 'current_streak' in data
+
+
+def test_document_access_is_owner_scoped():
+    owner=auth_user()
+    other=auth_user()
+    with SessionLocal() as db:
+        owner_email=client.get('/api/auth/me',headers=owner).json()['email']
+        user=db.query(User).filter(User.email==owner_email).one()
+        db.add(DocumentRecord(user_id=user.id,document_id='owner-only-test-document',filename='private.pdf',pages=1))
+        db.commit()
+    own=client.get('/api/documents',headers=owner)
+    assert own.status_code==200
+    assert any(x['document_id']=='owner-only-test-document' for x in own.json())
+    other_docs=client.get('/api/documents',headers=other)
+    assert other_docs.status_code==200
+    assert all(x['document_id']!='owner-only-test-document' for x in other_docs.json())
+    assert client.get('/api/documents/owner-only-test-document/search?q=test',headers=other).status_code==404
