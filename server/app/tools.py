@@ -110,6 +110,10 @@ def tool_for_text(text: str) -> tuple[str, dict[str, Any]] | None:
     q = text.strip().lower()
     if q in {"time", "what time is it", "current time", "date today", "what is today"}:
         return "time", {}
+    if q in {"show my subjects", "my subjects", "list my subjects"}:
+        return "study_summary", {"subjects": []}
+    if q in {"show my notes", "my notes", "list my notes"}:
+        return "notes_summary", {"notes": []}
     match = re.search(r"(?:calculate|what is)\s+([0-9pi e+\-*/().%]+)$", q)
     if not match:
         return None
