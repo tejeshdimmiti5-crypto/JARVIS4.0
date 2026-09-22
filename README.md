@@ -299,3 +299,22 @@ Repository: https://github.com/tejeshdimmiti5-crypto/JARVIS4.0
 ### ⚠️ Note
 
 JARVIS is an evolving project. Some AI/provider capabilities depend on the configured model and environment. Always keep production secrets outside Git.
+
+
+## 🧠 Multi-AI Orchestration (Upgrade)
+
+JARVIS now has an optional multi-provider AI layer. The backend can discover configured providers and query them in parallel through `/api/ai/compare`, then synthesize the available answers into one response.
+
+Supported adapters:
+- Gemini
+- OpenAI
+- Anthropic
+- Ollama/local models
+
+Endpoints:
+```text
+GET  /api/ai/models
+POST /api/ai/compare
+```
+
+Providers are optional. JARVIS continues to work with the existing Gemini/Ollama/offline architecture when other provider keys are not configured. Never commit provider API keys.
