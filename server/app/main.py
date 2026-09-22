@@ -20,7 +20,7 @@ from .vector_store import index_chunks,semantic_search
 from .agents import route_agent
 from .tools import list_tools,run_tool
 from .engine import generate_text,selected_engine,OLLAMA_MODEL
-GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL','gemini-2.0-flash');ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
+GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL',os.getenv('GEMINI_MODEL','gemini-2.0-flash'));ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
 app=FastAPI(title='JARVIS API',version='2.0.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Authorization','Content-Type'])
 class ChatRequest(BaseModel):question:str=Field(min_length=1,max_length=12000);context:str=Field(default='',max_length=50000);document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
 class ChatResponse(BaseModel):answer:str;model:str;used_ai:bool;sources:list[dict[str,Any]]=Field(default_factory=list)
@@ -86,7 +86,7 @@ async def health():
  try:
   with engine.connect() as c:c.exec_driver_sql('SELECT 1');database=True
  except Exception:pass
- return {'status':'ok','service':'JARVIS API','ai_configured':selected_engine()!='offline','vector_store':'chroma','database':database}
+ return {'status':'ok','service':'JARVIS API','ai_configured':selected_engine()!='offline','ai_engine':selected_engine(),'ai_model':os.getenv('GEMINI_MODEL',GEMINI_MODEL) if selected_engine()=='gemini' else OLLAMA_MODEL if selected_engine()=='ollama' else 'offline','vector_store':'chroma','database':database}
 @app.post('/api/auth/register')
 def register(data:AuthRequest,db:Session=Depends(db_session)):
  email=data.email.strip().lower()
@@ -160,12 +160,6 @@ async def run_chat(req:ChatRequest,user:User|None=None,db:Session|None=None)->tu
   else:
    raise
  return a,sources
-@app.get('/api/chat/history')
-def chat_history(limit:int=100,user:User=Depends(current_user),db:Session=Depends(db_session)):
- limit=max(1,min(limit,200))
- rows=db.scalars(select(ChatMessage).where(ChatMessage.user_id==user.id).order_by(ChatMessage.created_at.desc()).limit(limit)).all()
- rows=list(reversed(rows))
- return [{'id':r.id,'role':r.role,'content':r.content,'created_at':r.created_at.isoformat() if r.created_at else None} for r in rows]
 @app.post('/api/chat',response_model=ChatResponse)
 async def chat(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
  if req.document_id:
@@ -183,7 +177,9 @@ async def generate_flashcards(req:FlashcardRequest,user:User|None=Depends(option
  if req.document_id and GEMINI_API_KEY:
   try:context='\n\n'.join(f'[Page {h["page"]}]\n{h["text"]}' for h in await semantic_search(req.topic,req.document_id,top_k=min(req.count,10)))
   except Exception:pass
- text=await gemini(f'Create exactly {req.count} study flashcards. Return ONLY Q:/A: lines. Topic: {req.topic}\nMaterial:\n{context[:30000]}') if GEMINI_API_KEY else ''
+ text=''
+ if selected_engine()!='offline':
+  text=await gemini(f'Create exactly {req.count} study flashcards. Return ONLY Q:/A: lines. Topic: {req.topic}\nMaterial:\n{context[:30000]}')
  cards=parse_flashcards(text)[:req.count] if text else []
  if not cards:cards=[Flashcard(question=f'What is the key idea of {req.topic}?',answer='Review the definition, core concepts, examples, and exam points.')]
  if user:
