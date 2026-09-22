@@ -10,6 +10,8 @@ class Chunk:
 
 
 def chunk_document(text: str, max_chars: int = 1800, overlap: int = 250) -> list[Chunk]:
+    if max_chars <= 0 or overlap < 0 or overlap >= max_chars:
+        raise ValueError('overlap must be non-negative and smaller than max_chars')
     """Split extracted PDF text into page-aware overlapping chunks."""
     pages = re.split(r"(?=PAGE\s+\d+\n)", text.strip())
     chunks: list[Chunk] = []
@@ -35,11 +37,14 @@ def chunk_document(text: str, max_chars: int = 1800, overlap: int = 250) -> list
 def lexical_retrieve(query: str, chunks: list[Chunk], top_k: int = 5) -> list[Chunk]:
     """Small dependency-free retrieval layer; can be replaced by embeddings later."""
     terms = {t for t in re.findall(r"[a-zA-Z0-9]{3,}", query.lower())}
+    if not terms or not chunks or top_k <= 0:
+        return []
     scored = []
     for chunk in chunks:
         words = set(re.findall(r"[a-zA-Z0-9]{3,}", chunk.text.lower()))
-        score = len(terms & words)
-        if score:
-            scored.append((score, chunk))
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [chunk for _, chunk in scored[:top_k]]
+        overlap = len(terms & words)
+        if overlap:
+            density = overlap / max(len(terms), 1)
+            scored.append((density, overlap, -chunk.page, chunk))
+    scored.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
+    return [chunk for _, _, _, chunk in scored[:top_k]]
