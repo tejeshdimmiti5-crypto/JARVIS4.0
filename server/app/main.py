@@ -20,6 +20,7 @@ from .vector_store import index_chunks,semantic_search
 from .agents import route_agent
 from .tools import list_tools,run_tool
 from .engine import generate_text,selected_engine,OLLAMA_MODEL
+from .multi_ai import compare_models, configured_models, synthesize
 GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL','gemini-2.0-flash');ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
 app=FastAPI(title='JARVIS API',version='2.0.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Authorization','Content-Type'])
 class ChatRequest(BaseModel):question:str=Field(min_length=1,max_length=12000);context:str=Field(default='',max_length=50000);document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
@@ -32,6 +33,8 @@ class FlashcardResponse(BaseModel):cards:list[Flashcard];model:str;used_ai:bool
 class SubjectRequest(BaseModel):name:str=Field(min_length=1,max_length=100);code:str=Field(default='',max_length=30);daily_minutes:int=Field(default=60,ge=15,le=480);exam_date:str|None=None
 class TaskComplete(BaseModel):completed:bool
 class ToolRequest(BaseModel):name:str=Field(min_length=1,max_length=100);arguments:dict[str,Any]=Field(default_factory=dict)
+class MultiAIRequest(BaseModel):question:str=Field(min_length=1,max_length=12000);context:str=Field(default='',max_length=30000);models:list[str]=Field(default_factory=list);synthesize:bool=True
+class MultiAIResponse(BaseModel):question:str;responses:list[dict[str,Any]];synthesis:str|None=None
 
 def event(db,user_id,event_type,minutes=0):db.add(StudyEvent(user_id=user_id,event_type=event_type,minutes=minutes));db.commit()
 def offline_answer(q:str)->str:
@@ -70,6 +73,18 @@ def owned_document(db:Session,user:User,document_id:str)->DocumentRecord:
  record=db.scalar(select(DocumentRecord).where(DocumentRecord.document_id==document_id,DocumentRecord.user_id==user.id))
  if not record:raise HTTPException(404,'Document not found')
  return record
+@app.get('/api/ai/models')
+def ai_models():
+    return {'models': configured_models()}
+
+@app.post('/api/ai/compare', response_model=MultiAIResponse)
+async def ai_compare(req: MultiAIRequest):
+    prompt = f"You are an AI assistant inside JARVIS. Answer accurately and clearly.\\n\\nCONTEXT:\\n{req.context[:30000]}\\n\\nQUESTION:\\n{req.question}"
+    responses = await compare_models(prompt, req.models or None)
+    payload = [{'provider': r.provider, 'model': r.model, 'answer': r.answer, 'ok': r.ok, 'error': r.error} for r in responses]
+    synthesis = await synthesize(req.question, responses) if req.synthesize else None
+    return MultiAIResponse(question=req.question, responses=payload, synthesis=synthesis)
+
 @app.get('/api/tools')
 def tools_catalog(user:User|None=Depends(optional_user)):
  return list_tools()
