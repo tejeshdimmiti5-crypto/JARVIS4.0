@@ -30,7 +30,10 @@ async def index_chunks(document_id:str,chunks:list[dict[str,Any]])->int:
  if ids:_collection.upsert(ids=ids,documents=texts,metadatas=metas,embeddings=vectors)
  return len(ids)
 async def semantic_search(query:str,document_id:str|None=None,top_k:int=5)->list[dict[str,Any]]:
+ query=query.strip()
+ if not query or top_k<=0:return []
  vector=await embed(query);kwargs={'query_embeddings':[vector],'n_results':max(1,min(top_k,20))}
  if document_id:kwargs['where']={'document_id':document_id}
- result=_collection.query(**kwargs);docs=result.get('documents',[[]])[0];metas=result.get('metadatas',[[]])[0];distances=result.get('distances',[[]])[0]
+ if _collection.count()==0:return []
+ result=_collection.query(**kwargs);docs=result.get('documents',[[]])[0] or [];metas=result.get('metadatas',[[]])[0] or [];distances=result.get('distances',[[]])[0] or []
  return [{'text':d,'page':m.get('page',1),'document_id':m.get('document_id'),'distance':distances[i] if i<len(distances) else None} for i,(d,m) in enumerate(zip(docs,metas))]
