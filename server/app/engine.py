@@ -24,7 +24,9 @@ def selected_engine() -> str:
         return engine
     if gemini_key:
         return "gemini"
-    return "offline"
+    # Prefer the local Ollama engine when Gemini is not configured.
+    # This keeps JARVIS usable without an internet AI provider on a local machine.
+    return "ollama"
 
 
 async def generate_text(prompt: str) -> tuple[str, str]:
@@ -110,8 +112,8 @@ async def generate_text(prompt: str) -> tuple[str, str]:
                 return answer, ollama_model
         except HTTPException:
             raise
-        except httpx.HTTPError:
-            pass
+        except (httpx.HTTPError, OSError) as exc:
+            logger.info("Local Ollama unavailable; using offline fallback: %s", exc)
         return "", "offline"
 
     return "", "offline"
