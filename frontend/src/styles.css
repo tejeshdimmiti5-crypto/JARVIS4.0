@@ -12,3 +12,15 @@
 
 /* Final JARVIS polish — preserves the original layout while keeping controls visually consistent. */
 button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid rgba(0,212,255,.55);outline-offset:2px}.nav,.new,.primary,.secondary,.icon,.command-bar button,.chips button,.composer,.card,.note,.stats>div,.empty,.notice{transition:border-color .18s ease,background .18s ease,transform .18s ease,box-shadow .18s ease}.primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 22px rgba(0,212,255,.16)}.secondary:hover,.new:hover{border-color:#31566b;transform:translateY(-1px)}.nav.active{box-shadow:inset 3px 0 0 #00d4ff}.msg.ai{box-shadow:0 6px 20px rgba(0,0,0,.12)}.notice{margin-left:24px;margin-right:24px}.jarvis-status{white-space:nowrap}.jarvis-status svg{filter:drop-shadow(0 0 5px rgba(114,245,187,.35))}@media(max-width:760px){.notice{margin-left:12px;margin-right:12px}.account .jarvis-status{display:none}.hero{margin-top:25px}}
+
+/* JARVIS motion polish — lightweight CSS animation, preserving the original interface. */
+@keyframes jarvisGlow{0%,100%{box-shadow:0 0 0 rgba(0,212,255,0),0 0 18px rgba(0,212,255,.05)}50%{box-shadow:0 0 28px rgba(0,212,255,.14),0 0 55px rgba(108,99,255,.05)}}
+@keyframes jarvisFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes jarvisPulse{0%,100%{opacity:.7}50%{opacity:1}}
+@keyframes jarvisShimmer{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+.orb{animation:jarvisFloat 4s ease-in-out infinite,jarvisGlow 4s ease-in-out infinite}
+.jarvis-panel{animation:jarvisGlow 5s ease-in-out infinite}
+.jarvis-status svg{animation:jarvisPulse 2s ease-in-out infinite}
+.brand span{animation:jarvisGlow 4s ease-in-out infinite}
+.hero h2{background:linear-gradient(90deg,#e8f7ff,#7fe8ff,#e8f7ff);background-size:200% auto;background-clip:text;-webkit-background-clip:text;color:transparent;animation:jarvisShimmer 6s linear infinite}
+@media(prefers-reduced-motion:reduce){.orb,.jarvis-panel,.jarvis-status svg,.brand span,.hero h2{animation:none}}
