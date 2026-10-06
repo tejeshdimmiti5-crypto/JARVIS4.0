@@ -20,7 +20,7 @@ from .vector_store import index_chunks,semantic_search
 from .agents import route_agent
 from .tools import list_tools,run_tool
 from .engine import generate_text,selected_engine,OLLAMA_MODEL
-GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL',os.getenv('GEMINI_MODEL','gemini-2.0-flash'));ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
+GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL','gemini-3.8-flash');ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
 app=FastAPI(title='JARVIS API',version='2.0.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Authorization','Content-Type'])
 class ChatRequest(BaseModel):question:str=Field(min_length=1,max_length=12000);context:str=Field(default='',max_length=50000);document_id:str|None=None;task:str='answer';use_retrieval:bool=True;semantic:bool=True
 class ChatResponse(BaseModel):answer:str;model:str;used_ai:bool;sources:list[dict[str,Any]]=Field(default_factory=list)
