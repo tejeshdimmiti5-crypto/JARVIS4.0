@@ -8,12 +8,16 @@ services:
     dockerContext: ./server
     healthCheckPath: /api/health
     envVars:
+      - key: ENVIRONMENT
+        value: production
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
         value: gemini-3.8-flash
       - key: GEMINI_EMBEDDING_MODEL
         value: gemini-embedding-001
+      - key: CHROMA_PATH
+        value: /app/data/chroma
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
