@@ -20,7 +20,7 @@ services:
       - "8000:8000"
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
       GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
       DATABASE_URL: postgresql+psycopg://jarvis:jarvis_dev_password@db:5432/jarvis
       JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-me}
