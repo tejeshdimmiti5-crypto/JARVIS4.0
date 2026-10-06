@@ -24,8 +24,11 @@ def selected_engine() -> str:
         return engine
     if gemini_key:
         return "gemini"
-    # Prefer the local Ollama engine when Gemini is not configured.
-    # This keeps JARVIS usable without an internet AI provider on a local machine.
+    # Ollama is useful for local development, but Render does not provide
+    # an Ollama daemon. In production, fail safely to the deterministic
+    # offline mode instead of reporting a phantom AI provider.
+    if os.getenv("ENVIRONMENT", "development").lower() == "production":
+        return "offline"
     return "ollama"
 
 
