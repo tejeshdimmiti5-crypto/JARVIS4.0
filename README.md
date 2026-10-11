@@ -8,6 +8,7 @@
 
 **Live app:** https://jarvis-ui-6eu8.onrender.com  
 **Source code:** https://github.com/tejeshdimmiti5-crypto/JARVIS4.0
+**Reviewer handoff:** [Read REVIEW_GUIDE.md](https://github.com/tejeshdimmiti5-crypto/JARVIS4.0/blob/main/REVIEW_GUIDE.md) — setup steps, feature checklist, limitations, and feedback format.
 
 JARVIS 4.0 is a full-stack AI study assistant designed to help students **learn, revise, organize, and track progress** from one workspace.
 
