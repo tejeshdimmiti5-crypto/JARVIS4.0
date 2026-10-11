@@ -177,15 +177,22 @@ async def generate_flashcards(req:FlashcardRequest,user:User|None=Depends(option
  if req.document_id and GEMINI_API_KEY:
   try:context='\n\n'.join(f'[Page {h["page"]}]\n{h["text"]}' for h in await semantic_search(req.topic,req.document_id,top_k=min(req.count,10)))
   except Exception:pass
- text=''
+ text='';provider_model='offline'
  if selected_engine()!='offline':
-  text=await gemini(f'Create exactly {req.count} study flashcards. Return ONLY Q:/A: lines. Topic: {req.topic}\nMaterial:\n{context[:30000]}')
+  try:
+   text,provider_model=await generate_text(f'Create exactly {req.count} study flashcards. Return ONLY Q:/A: lines. Topic: {req.topic}\nMaterial:\n{context[:30000]}')
+  except HTTPException as exc:
+   if exc.status_code not in {502,503,504}:raise
+   # Preserve study functionality when the configured AI provider is unavailable.
+   text='';provider_model='offline'
  cards=parse_flashcards(text)[:req.count] if text else []
- if not cards:cards=[Flashcard(question=f'What is the key idea of {req.topic}?',answer='Review the definition, core concepts, examples, and exam points.')]
+ used_ai=bool(cards and provider_model!='offline')
+ if not cards:
+  cards=[Flashcard(question=f'What is the key idea of {req.topic}?',answer='Review the definition, core concepts, examples, and exam points.')]
  if user:
   for c in cards:db.add(FlashcardRecord(user_id=user.id,question=c.question,answer=c.answer,document_id=req.document_id))
   db.commit();event(db,user.id,'flashcard')
- return FlashcardResponse(cards=cards,model=GEMINI_MODEL if selected_engine()=='gemini' else OLLAMA_MODEL if selected_engine()=='ollama' else 'offline',used_ai=selected_engine()!='offline')
+ return FlashcardResponse(cards=cards,model=provider_model if used_ai else 'offline',used_ai=used_ai)
 @app.get('/api/flashcards')
 def list_flashcards(user:User=Depends(current_user),db:Session=Depends(db_session)):
  rows=db.scalars(select(FlashcardRecord).where(FlashcardRecord.user_id==user.id).order_by(FlashcardRecord.created_at.desc())).all()
