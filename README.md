@@ -300,3 +300,14 @@ Repository: https://github.com/tejeshdimmiti5-crypto/JARVIS4.0
 ### ⚠️ Note
 
 JARVIS is an evolving project. Some AI/provider capabilities depend on the configured model and environment. Always keep production secrets outside Git.
+
+
+## Agent Mode (read-only tools)
+
+The optional `POST /api/agent/run` endpoint accepts an authenticated user's goal and executes a bounded plan using only registered read-only JARVIS tools. Plans are limited to four steps and support study briefings, focus recommendations, dashboard/progress summaries, weekly reviews, subjects, notes, time, and safe arithmetic.
+
+- Agent runs require authentication and use the authenticated account's own study data.
+- Tool execution is allowlisted; arbitrary shell commands, filesystem access, network requests, and mutating actions are unavailable.
+- If AI planning is unavailable or produces an invalid plan, a deterministic planner handles supported goals.
+- A completed step means its registered tool returned a result; it does not mean any external deployment or unrelated action occurred.
+- Validate with the backend pytest suite and review GitHub Actions checks on the pull request.
