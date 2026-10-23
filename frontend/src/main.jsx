@@ -1,5 +1,5 @@
 import React,{useEffect,useState}from'react';import{createRoot}from'react-dom/client';import{BookOpen,FileText,MessageSquare,Brain,BarChart3,Upload,Send,Settings,Plus,Sparkles,LogIn,LogOut,Trash2,CalendarDays,Layers,RefreshCw,Mic,MicOff,Volume2,VolumeX,Activity,Command,Save}from'lucide-react';import'./styles.css';
-const API=import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+const API=import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:8000');
 async function savePreferences(daily_minutes,focus_subject,token,authHeaders){if(!token)throw new Error('Please log in first');const r=await fetch(`${API}/api/preferences`,{method:'PUT',headers:{'Content-Type':'application/json',...authHeaders},body:JSON.stringify({daily_minutes,focus_subject})});const d=await r.json().catch(()=>({}));if(r.status===401)throw new Error('Your session expired. Please log in again.');if(!r.ok)throw new Error(d.detail||'Could not save preferences');return true}
 const tabs=[['chat','JARVIS Chat',MessageSquare],['pdf','PDF Study',FileText],['notes','My Notes',BookOpen],['quiz','Quiz Me',Brain],['planner','Study Planner',CalendarDays],['flashcards','Flashcards',Layers],['progress','Progress',BarChart3]];
 const emptyAnalytics={questions:0,study_minutes:0,completed_tasks:0,total_tasks:0,notes:0,subjects:0};
