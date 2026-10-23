@@ -34,3 +34,11 @@ def test_user_data_tools_ignore_model_supplied_private_records():
         "subjects": ["someone else's data"], "notes": ["private"], "tasks": [{"title": "injected"}]
     })
     assert args == context
+
+
+def test_agent_endpoint_requires_authentication():
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    response = TestClient(app).post("/api/agent/run", json={"goal": "daily briefing"})
+    assert response.status_code in (401, 403)
