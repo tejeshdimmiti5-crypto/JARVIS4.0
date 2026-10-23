@@ -22,7 +22,7 @@ def test_health():
     body=r.json()
     assert body['status']=='ok'
     assert body['database'] is True
-    assert body['vector_store']=='chroma'
+    assert body['vector_store'] in {'qdrant', 'not_configured'}
 
 
 def test_chat_offline():
