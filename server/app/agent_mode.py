@@ -26,11 +26,13 @@ def parse_agent_plan(text: str, max_steps: int = MAX_AGENT_STEPS) -> list[dict[s
         return []
     limit = max(1, min(max_steps, MAX_AGENT_STEPS))
     result: list[dict[str, Any]] = []
-    for item in payload["steps"][:limit]:
+    for item in payload["steps"]:
+        if len(result) >= limit:
+            break
         if not isinstance(item, dict):
             continue
         name, args = item.get("tool"), item.get("arguments", {})
-        if name not in ALLOWED_AGENT_TOOLS or not isinstance(args, dict):
+        if not isinstance(name, str) or name not in ALLOWED_AGENT_TOOLS or not isinstance(args, dict):
             continue
         result.append({"tool": name, "arguments": args, "reason": str(item.get("reason", ""))[:240]})
     return result
