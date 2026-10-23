@@ -19,6 +19,7 @@ from .study import PlanInput,make_plan
 from .vector_store import index_chunks,semantic_search
 from .agents import route_agent
 from .tools import list_tools,run_tool
+from .agent_mode import run_agent_goal
 from .engine import generate_text,selected_engine,OLLAMA_MODEL
 GEMINI_API_KEY=os.getenv('GEMINI_API_KEY','');GEMINI_MODEL=os.getenv('GEMINI_MODEL','gemini-3.8-flash');ALLOWED_ORIGINS=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
 app=FastAPI(title='JARVIS API',version='2.0.0',description='AI-powered RAG study assistant API');app.add_middleware(CORSMiddleware,allow_origins=ALLOWED_ORIGINS,allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Authorization','Content-Type'])
@@ -32,6 +33,7 @@ class FlashcardResponse(BaseModel):cards:list[Flashcard];model:str;used_ai:bool
 class SubjectRequest(BaseModel):name:str=Field(min_length=1,max_length=100);code:str=Field(default='',max_length=30);daily_minutes:int=Field(default=60,ge=15,le=480);exam_date:str|None=None
 class TaskComplete(BaseModel):completed:bool
 class ToolRequest(BaseModel):name:str=Field(min_length=1,max_length=100);arguments:dict[str,Any]=Field(default_factory=dict)
+class AgentRunRequest(BaseModel):goal:str=Field(min_length=1,max_length=4000);max_steps:int=Field(default=4,ge=1,le=4)
 
 def event(db,user_id,event_type,minutes=0):db.add(StudyEvent(user_id=user_id,event_type=event_type,minutes=minutes));db.commit()
 def offline_answer(q:str)->str:
@@ -168,6 +170,28 @@ async def chat(req:ChatRequest,user:User|None=Depends(optional_user),db:Session=
  a,sources=await run_chat(req,user,db)
  if user:db.add_all([ChatMessage(user_id=user.id,role='user',content=req.question),ChatMessage(user_id=user.id,role='assistant',content=a)]);db.commit();event(db,user.id,'question')
  return ChatResponse(answer=a,model=GEMINI_MODEL if selected_engine()=='gemini' else OLLAMA_MODEL if selected_engine()=='ollama' else 'offline',used_ai=selected_engine()!='offline',sources=sources)
+@app.post('/api/agent/run')
+async def run_agent(req:AgentRunRequest,user:User=Depends(current_user),db:Session=Depends(db_session)):
+    subjects=db.scalars(select(Subject).where(Subject.user_id==user.id)).all()
+    subject_by_id={s.id:s.name for s in subjects}
+    notes=db.scalars(select(StudyNote).where(StudyNote.user_id==user.id).order_by(StudyNote.updated_at.desc()).limit(50)).all()
+    tasks=db.scalars(select(StudyTask).where(StudyTask.user_id==user.id).order_by(StudyTask.task_date.asc()).limit(100)).all()
+    cutoff=datetime.now(timezone.utc)-timedelta(days=7)
+    events=db.scalars(select(StudyEvent).where(StudyEvent.user_id==user.id,StudyEvent.created_at>=cutoff)).all()
+    pref=db.scalar(select(UserPreference).where(UserPreference.user_id==user.id))
+    context={
+        "subjects":[s.name for s in subjects],
+        "notes":[n.title for n in notes],
+        "tasks":[{"title":t.title,"subject":subject_by_id.get(t.subject_id,""),"completed":t.completed,"minutes":t.minutes,"task_date":str(t.task_date)} for t in tasks],
+        "events":[{"minutes":e.minutes} for e in events],
+        "focus_subject":pref.focus_subject if pref and pref.focus_subject else "",
+    }
+    result=await run_agent_goal(req.goal,context,req.max_steps)
+    db.add_all([ChatMessage(user_id=user.id,role="user",content="[Agent Mode] "+req.goal),ChatMessage(user_id=user.id,role="assistant",content=result["summary"])])
+    db.commit()
+    event(db,user.id,"agent_run")
+    return result
+
 @app.post('/api/flashcards/generate',response_model=FlashcardResponse)
 async def generate_flashcards(req:FlashcardRequest,user:User|None=Depends(optional_user),db:Session=Depends(db_session)):
  if req.document_id:
