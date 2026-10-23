@@ -16,7 +16,7 @@ from .flashcards import FlashcardRecord
 from .analytics import daily_summary
 from .rag import chunk_document,lexical_retrieve
 from .study import PlanInput,make_plan
-from .vector_store import index_chunks,semantic_search
+from .vector_store import index_chunks,semantic_search,vector_store_status
 from .agents import route_agent
 from .tools import list_tools,run_tool
 from .agent_mode import run_agent_goal
@@ -116,7 +116,7 @@ async def health():
  try:
   with engine.connect() as c:c.exec_driver_sql('SELECT 1');database=True
  except Exception:pass
- return {'status':'ok','service':'JARVIS API','ai_configured':selected_engine()!='offline','ai_engine':selected_engine(),'ai_model':os.getenv('GEMINI_MODEL',GEMINI_MODEL) if selected_engine()=='gemini' else OLLAMA_MODEL if selected_engine()=='ollama' else 'offline','vector_store':'chroma','database':database}
+ return {'status':'ok','service':'JARVIS API','ai_configured':selected_engine()!='offline','ai_engine':selected_engine(),'ai_model':os.getenv('GEMINI_MODEL',GEMINI_MODEL) if selected_engine()=='gemini' else OLLAMA_MODEL if selected_engine()=='ollama' else 'offline','vector_store':vector_store_status(),'database':database}
 @app.post('/api/auth/register')
 def register(data:AuthRequest,db:Session=Depends(db_session)):
  email=data.email.strip().lower()
