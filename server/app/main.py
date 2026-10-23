@@ -70,11 +70,11 @@ def build_prompt(req:ChatRequest,retrieved:str='')->str:
         "Use Markdown headings and bullets when they improve readability; avoid unnecessary headings for short answers. "
         "Be concise by default, but thorough for learning requests. If the user is confused, explain differently rather than repeating yourself. "
         "Never invent facts, personal data, actions, or capabilities. If information is missing or uncertain, say so plainly. "
-        + 'You are operating as the ' + agent.name + ' agent. ' + agent.instruction + '\\n'
-        + task_instructions.get(req.task,task_instructions['answer']) + '\\n'
-        + ("Use supplied study material as the primary source and say when it does not contain the answer. Cite only supplied page markers such as [Page 2]; never fabricate citations.\\n" if retrieved.strip() else "Answer from your knowledge and flag meaningful uncertainty. Do not claim to have used a document when none was supplied.\\n")
-        + '\\nSTUDY MATERIAL:\\n' + (retrieved[:30000] if retrieved.strip() else '(No retrieved material supplied.)')
-        + '\\n\\nUSER QUESTION:\\n' + req.question.strip()
+        + 'You are operating as the ' + agent.name + ' agent. ' + agent.instruction + '\n'
+        + task_instructions.get(req.task,task_instructions['answer']) + '\n'
+        + ("Use supplied study material as the primary source and say when it does not contain the answer. Cite only supplied page markers such as [Page 2]; never fabricate citations.\n" if retrieved.strip() else "Answer from your knowledge and flag meaningful uncertainty. Do not claim to have used a document when none was supplied.\n")
+        + '\nSTUDY MATERIAL:\n' + (retrieved[:30000] if retrieved.strip() else '(No retrieved material supplied.)')
+        + '\n\nUSER QUESTION:\n' + req.question.strip()
     )
 def memory_context(db:Session,user:User)->str:
  rows=db.scalars(select(ChatMessage).where(ChatMessage.user_id==user.id).order_by(ChatMessage.created_at.desc()).limit(8)).all()
