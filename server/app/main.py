@@ -37,17 +37,45 @@ class AgentRunRequest(BaseModel):goal:str=Field(min_length=1,max_length=4000);ma
 
 def event(db,user_id,event_type,minutes=0):db.add(StudyEvent(user_id=user_id,event_type=event_type,minutes=minutes));db.commit()
 def offline_answer(q:str)->str:
- q=q.lower()
- if 'supervised' in q:return 'Supervised learning trains a model with labelled examples. Classification predicts categories, while regression predicts numerical values.'
- if 'big data' in q:return 'Big Data refers to datasets whose volume, velocity, variety, veracity or value create challenges for conventional systems.'
- if 'stack' in q:return 'A stack follows LIFO (Last In, First Out). Common operations are push, pop and peek.'
- return 'JARVIS is running in offline mode. Configure GEMINI_API_KEY on the backend to enable real AI responses.'
+    """Useful, honest fallback answers when no model provider can respond."""
+    text=q.strip().lower()
+    if any(x in text for x in ("hello","hi jarvis","hey jarvis","good morning","good evening")):
+        return "Hello! I'm JARVIS, your study and productivity assistant. I can explain a concept, help you revise, or organize your next study session. What would you like to work on?"
+    if "supervised" in text:
+        return "## Supervised learning\n\nSupervised learning trains a model using **labelled examples**—each example includes the correct answer.\n\n- **Classification:** predicts a category, such as spam or not spam.\n- **Regression:** predicts a number, such as a house price.\n\n**Example:** learn from labelled emails to predict whether a new email is spam.\n\n**Exam point:** supervised learning uses labelled data."
+    if "unsupervised" in text:
+        return "## Unsupervised learning\n\nUnsupervised learning finds patterns in **unlabelled data**.\n\n- **Clustering:** groups similar records, such as customer segments.\n- **Dimensionality reduction:** represents data with fewer features.\n\n**Remember:** supervised learning uses labelled examples; unsupervised learning explores structure without labels."
+    if "big data" in text:
+        return "## Big Data\n\nBig Data describes datasets whose scale or complexity makes traditional processing difficult. The **5 Vs** are:\n\n- **Volume:** amount of data.\n- **Velocity:** speed of generation and processing.\n- **Variety:** formats and sources.\n- **Veracity:** data quality and trustworthiness.\n- **Value:** useful insight gained.\n\n**Example:** analysing real-time transactions for a large online store. For exams, define each V and give an example."
+    if "stack" in text:
+        return "## Stack data structure\n\nA stack follows **LIFO (Last In, First Out)**: the last item added is the first removed.\n\n- **Push:** add an item.\n- **Pop:** remove the top item.\n- **Peek:** inspect the top item.\n\n**Example:** a stack of plates. Add A, then B; B is removed first. Stacks are used in undo operations, function calls, and expression evaluation."
+    if "queue" in text:
+        return "## Queue data structure\n\nA queue follows **FIFO (First In, First Out)**: the first item added is the first removed.\n\n- **Enqueue:** add to the rear.\n- **Dequeue:** remove from the front.\n\n**Example:** a line at a ticket counter. Unlike a stack, a queue serves the oldest waiting item first."
+    if any(x in text for x in ("what can you do","help me","your features","capabilities")):
+        return "I'm JARVIS, your AI study assistant. I can explain topics, help revise, create summaries and quizzes, study uploaded PDFs when available, organize subjects, and review saved progress. Sign in for personalized features. AI-generated answers require a working provider; at the moment I can only provide limited offline help."
+    return "I'm here to help, but my AI provider is currently unavailable, so I can't generate a reliable full answer right now. If you administer this deployment, check the backend AI_ENGINE and GEMINI_API_KEY configuration and server logs. Available saved study tools may still work."
 def build_prompt(req:ChatRequest,retrieved:str='')->str:
- agent=route_agent(req.question,req.task,req.document_id)
- agent_name=agent.name
- agent_instruction=agent.instruction
- task={'answer':'Answer the student clearly and exam-ready.','summary':'Create an exam-ready summary with key concepts, definitions, formulas or steps, and likely questions.','quiz':'Generate 5 MCQs with four options, the correct answer, and a one-line explanation.','notes':'Create concise revision notes with headings and bullet points.','flashcards':'Create 10 study flashcards. Format each as Q: question / A: answer.'}.get(req.task,'Answer the student clearly.')
- return f'You are JARVIS, a university study assistant. You are operating as the {agent_name} agent. {agent_instruction}\n{task}\nUse retrieved material when present. Cite supporting pages as [Page N]. Never invent citations.\n\nRETRIEVED:\n{retrieved[:30000]}\n\nQUESTION:\n{req.question}'
+    agent=route_agent(req.question,req.task,req.document_id)
+    task_instructions={
+        'answer':'Answer the exact question first. Explain clearly in natural language with a relevant example. Match depth to the question; do not pad the response.',
+        'summary':'Create an exam-ready summary with headings, definitions, key concepts, formulas or steps where relevant, a short example, and three likely exam questions.',
+        'quiz':'Create exactly five useful MCQs, each with four options (A-D), the correct answer, and a one-sentence explanation. Avoid ambiguous options.',
+        'notes':'Create concise revision notes with headings, bullets, important terms, examples, and a quick-revision recap.',
+        'flashcards':'Create ten distinct study flashcards. Format each exactly as Q: question on one line and A: answer on the next line.',
+    }
+    return (
+        "You are JARVIS, a thoughtful AI study partner and productivity assistant. "
+        "Sound warm, confident, clear, and conversational—not robotic, generic, excessively formal, or overenthusiastic. "
+        "Address the user's actual request first. Explain difficult ideas step by step and use simple examples. "
+        "Use Markdown headings and bullets when they improve readability; avoid unnecessary headings for short answers. "
+        "Be concise by default, but thorough for learning requests. If the user is confused, explain differently rather than repeating yourself. "
+        "Never invent facts, personal data, actions, or capabilities. If information is missing or uncertain, say so plainly. "
+        + 'You are operating as the ' + agent.name + ' agent. ' + agent.instruction + '\\n'
+        + task_instructions.get(req.task,task_instructions['answer']) + '\\n'
+        + ("Use supplied study material as the primary source and say when it does not contain the answer. Cite only supplied page markers such as [Page 2]; never fabricate citations.\\n" if retrieved.strip() else "Answer from your knowledge and flag meaningful uncertainty. Do not claim to have used a document when none was supplied.\\n")
+        + '\\nSTUDY MATERIAL:\\n' + (retrieved[:30000] if retrieved.strip() else '(No retrieved material supplied.)')
+        + '\\n\\nUSER QUESTION:\\n' + req.question.strip()
+    )
 def memory_context(db:Session,user:User)->str:
  rows=db.scalars(select(ChatMessage).where(ChatMessage.user_id==user.id).order_by(ChatMessage.created_at.desc()).limit(8)).all()
  notes=db.scalars(select(StudyNote).where(StudyNote.user_id==user.id).order_by(StudyNote.updated_at.desc()).limit(5)).all()
