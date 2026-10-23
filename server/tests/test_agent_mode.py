@@ -42,3 +42,12 @@ def test_agent_endpoint_requires_authentication():
 
     response = TestClient(app).post("/api/agent/run", json={"goal": "daily briefing"})
     assert response.status_code in (401, 403)
+
+
+def test_build_prompt_uses_real_newlines():
+    from app.main import ChatRequest, build_prompt
+
+    prompt = build_prompt(ChatRequest(question="Explain supervised learning"))
+    assert "\nSTUDY MATERIAL:\n" in prompt
+    assert "\\nSTUDY MATERIAL:\\n" not in prompt
+
