@@ -18,8 +18,9 @@ MAX_AGENT_STEPS = 4
 
 def parse_agent_plan(text: str, max_steps: int = MAX_AGENT_STEPS) -> list[dict[str, Any]]:
     """Parse and validate a model plan; reject tools outside the allowlist."""
+    raw = text.strip().replace(chr(96) * 3 + "json", "").replace(chr(96) * 3, "").strip()
     try:
-        payload = json.loads(text.strip())
+        payload = json.loads(raw)
     except (json.JSONDecodeError, TypeError):
         return []
     if not isinstance(payload, dict) or not isinstance(payload.get("steps"), list):
