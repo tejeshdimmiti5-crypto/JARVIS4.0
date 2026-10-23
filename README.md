@@ -52,7 +52,7 @@ It combines a React/Vite interface, FastAPI backend, PostgreSQL persistence, doc
       └───────────────┘    └─────────────────┘   └──────────────┘
                                     │
                               ┌─────▼─────┐
-                              │ ChromaDB  │
+                              │ Qdrant Cloud  │
                               └───────────┘
 ```
 
