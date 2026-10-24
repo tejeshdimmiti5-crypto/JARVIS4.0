@@ -116,7 +116,7 @@ async def health():
  try:
   with engine.connect() as c:c.exec_driver_sql('SELECT 1');database=True
  except Exception:pass
- return {'status':'ok','service':'JARVIS API','ai_configured':selected_engine()!='offline','ai_engine':selected_engine(),'ai_model':os.getenv('GEMINI_MODEL',GEMINI_MODEL) if selected_engine()=='gemini' else OLLAMA_MODEL if selected_engine()=='ollama' else 'offline','vector_store':vector_store_status(),'database':database}
+ return {'status':'ok' if database else 'degraded','service':'JARVIS API','ai_configured':selected_engine()!='offline','ai_engine':selected_engine(),'ai_model':os.getenv('GEMINI_MODEL',GEMINI_MODEL) if selected_engine()=='gemini' else OLLAMA_MODEL if selected_engine()=='ollama' else 'offline','vector_store':vector_store_status(),'database':database}
 @app.post('/api/auth/register')
 def register(data:AuthRequest,db:Session=Depends(db_session)):
  email=data.email.strip().lower()

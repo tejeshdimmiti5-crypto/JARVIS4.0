@@ -15,7 +15,7 @@ Render free services may sleep after inactivity, so the first page/API request c
 
 ## What the project is
 
-JARVIS 4.0 is a full-stack AI study and productivity assistant. The frontend is React + Vite, the API is FastAPI, persistent app data uses SQLAlchemy/PostgreSQL, document retrieval uses a RAG pipeline with ChromaDB and lexical fallback, and text generation can use Gemini or a local Ollama model. An offline fallback supports only limited deterministic help; it is not a substitute for an available LLM.
+JARVIS 4.0 is a full-stack AI study and productivity assistant. The frontend is React + Vite, the API is FastAPI, persistent app data uses SQLAlchemy/PostgreSQL, document retrieval uses a RAG pipeline with optional Qdrant semantic vectors and lexical fallback, and text generation can use Gemini or a local Ollama model. An offline fallback supports only limited deterministic help; it is not a substitute for an available LLM.
 
 ## Main modules
 

@@ -25,6 +25,20 @@ def test_health():
     assert body['vector_store'] in {'qdrant', 'not_configured'}
 
 
+def test_health_reports_degraded_when_database_is_unavailable(monkeypatch):
+    from app import main as main_module
+
+    def database_unavailable():
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(main_module.engine, "connect", database_unavailable)
+    response = client.get("/api/health")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "degraded"
+    assert response.json()["database"] is False
+
+
 def test_chat_offline():
     r=client.post('/api/chat',json={'question':'What is a stack?'})
     assert r.status_code==200
